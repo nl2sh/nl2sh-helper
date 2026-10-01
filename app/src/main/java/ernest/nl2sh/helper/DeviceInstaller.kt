@@ -15,7 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 
 internal class DeviceInstaller(private val context: Context) {
-    suspend fun install(host: String, port: Int, report: (String) -> Unit): String {
+    suspend fun install(host: String, port: Int, report: suspend (String) -> Unit): String = withContext(Dispatchers.IO) {
         val client = DefaultAdbClient.factory(context).create()
         try {
             report("连接目标设备…首次连接请在目标设备批准 ADB 授权")
@@ -49,13 +49,13 @@ internal class DeviceInstaller(private val context: Context) {
             }
             check(ready) { "后台 Web 服务未能在目标设备 9999 端口响应；请检查网络和 nl2sh-web.log" }
             report("${release.tag} 已在目标设备后台运行。")
-            return "http://$host:9999/"
+            "http://$host:9999/"
         } finally {
             client.close()
         }
     }
 
-    private suspend fun deploy(client: AdbClient, binary: File, expectedSha: String, report: (String) -> Unit) {
+    private suspend fun deploy(client: AdbClient, binary: File, expectedSha: String, report: suspend (String) -> Unit) {
         runChecked(client, "mkdir -p $REMOTE_DIR")
         val current = runChecked(client, "toybox sha256sum $REMOTE_BINARY 2>/dev/null || true")
             .trim().substringBefore(' ').lowercase()

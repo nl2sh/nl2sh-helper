@@ -18,6 +18,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : Activity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -92,7 +93,7 @@ class MainActivity : Activity() {
         installJob = scope.launch {
             try {
                 webUrl = DeviceInstaller(applicationContext).install(host, port) { message ->
-                    statusView.text = message
+                    withContext(Dispatchers.Main) { statusView.text = message }
                 }
                 statusView.text = "已启动。点击按钮在系统浏览器访问 $webUrl"
                 openButton.isEnabled = true
