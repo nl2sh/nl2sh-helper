@@ -32,6 +32,10 @@ internal class DeviceInstaller(private val context: Context) {
             report("最新版本：${release.tag}；检查缓存及 SHA-256…")
             val (binary, expectedSha) = repository.cachedBinary(release)
             deploy(client, binary, expectedSha, report)
+            val installedVersion = runChecked(client, "$REMOTE_BINARY --version")
+            check(installedVersion == "nl2sh ${release.tag.removePrefix("v")}") {
+                "设备上的程序版本与发布标签不一致：$installedVersion"
+            }
             report("启动目标设备 Web 服务…")
             runChecked(client, stopManagedCommand())
             for (attempt in 1..10) {
