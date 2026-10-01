@@ -44,22 +44,9 @@ internal class ReleaseRepository(private val context: Context) {
     suspend fun cachedBinary(release: ReleaseBinary): Pair<File, String> = withContext(Dispatchers.IO) {
         val shaText = fetchText(release.shaUrl, 1024)
         val expected = parseSha256(shaText)
-        val destination = File(context.filesDir, "releases/${release.tag}/${release.abi}/nl2sh")
-        if (destination.isFile && sha256(destination) == expected) {
-            return@withContext destination to expected
-        }
-        check(destination.parentFile?.mkdirs() == true || destination.parentFile?.isDirectory == true) {
-            "Cannot create release cache"
-        }
-        val temp = File(destination.parentFile, "nl2sh.download")
-        try {
-            download(release.url, temp, 32_000_000)
-            check(sha256(temp) == expected) { "Downloaded nl2sh SHA-256 mismatch" }
-            check(temp.renameTo(destination)) { "Cannot save cached nl2sh" }
-        } finally {
-            temp.delete()
-        }
-        destination to expected
+        val file = ReleaseFileCache(File(context.filesDir, "releases"))
+            .getOrDownload(release, expected) { temp -> download(release.url, temp, 32_000_000) }
+        file to expected
     }
 
     private fun fetchText(url: String, limit: Int): String {
