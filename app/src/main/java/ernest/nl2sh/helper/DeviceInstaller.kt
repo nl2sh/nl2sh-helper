@@ -7,6 +7,7 @@ import ernest.ascrcpy.adb.DefaultAdbClient
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.InetSocketAddress
+import java.net.Proxy
 import java.net.Socket
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
@@ -82,7 +83,7 @@ internal class DeviceInstaller(private val context: Context) {
     }
 
     private suspend fun webReady(host: String): Boolean = withContext(Dispatchers.IO) {
-        val connection = (URL("http://$host:9999/api/state").openConnection() as HttpURLConnection).apply {
+        val connection = (URL("http://$host:9999/api/sessions").openConnection(Proxy.NO_PROXY) as HttpURLConnection).apply {
             connectTimeout = 1_000
             readTimeout = 1_000
         }
