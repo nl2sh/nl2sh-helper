@@ -36,6 +36,7 @@ class MainActivity : Activity() {
         webUrl = prefs.getString("web_url", null)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            isFocusableInTouchMode = true
             setPadding(dp(24), dp(28), dp(24), dp(28))
             setBackgroundColor(Color.rgb(247, 249, 251))
         }
@@ -77,6 +78,8 @@ class MainActivity : Activity() {
         statusView = label(webUrl?.let { "上次启动地址：$it" } ?: "等待连接。", 15, Color.DKGRAY, 20)
         root.addView(statusView)
         root.addView(label("目标 Web 界面当前无需登录，仅应在可信网络中使用。模型服务可在 Web 界面内配置。", 13, Color.GRAY, 26))
+        root.requestFocus()
+        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
     }
 
     private fun startInstall() {
