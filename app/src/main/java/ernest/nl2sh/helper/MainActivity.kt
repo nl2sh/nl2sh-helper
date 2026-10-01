@@ -33,6 +33,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val prefs = getSharedPreferences("connection", MODE_PRIVATE)
+        webUrl = prefs.getString("web_url", null)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(24), dp(28), dp(24), dp(28))
@@ -67,13 +68,13 @@ class MainActivity : Activity() {
         root.addView(installButton, marginTop(22))
         openButton = Button(this).apply {
             text = "在浏览器中打开 nl2sh"
-            isEnabled = false
+            isEnabled = webUrl != null
             setOnClickListener {
                 webUrl?.let { url -> startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
             }
         }
         root.addView(openButton, marginTop(8))
-        statusView = label("等待连接。", 15, Color.DKGRAY, 20)
+        statusView = label(webUrl?.let { "上次启动地址：$it" } ?: "等待连接。", 15, Color.DKGRAY, 20)
         root.addView(statusView)
         root.addView(label("目标 Web 界面当前无需登录，仅应在可信网络中使用。模型服务可在 Web 界面内配置。", 13, Color.GRAY, 26))
     }
@@ -95,6 +96,7 @@ class MainActivity : Activity() {
                 webUrl = DeviceInstaller(applicationContext).install(host, port) { message ->
                     withContext(Dispatchers.Main) { statusView.text = message }
                 }
+                getSharedPreferences("connection", MODE_PRIVATE).edit().putString("web_url", webUrl).apply()
                 statusView.text = "已启动。点击按钮在系统浏览器访问 $webUrl"
                 openButton.isEnabled = true
             } catch (error: Exception) {
