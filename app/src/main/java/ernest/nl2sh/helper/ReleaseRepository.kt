@@ -3,10 +3,12 @@ package ernest.nl2sh.helper
 import android.content.Context
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
@@ -49,16 +51,24 @@ internal class ReleaseRepository(private val context: Context) {
         file to expected
     }
 
-    private fun fetchText(url: String, limit: Int): String {
-        val connection = connect(url)
-        try {
-            connection.inputStream.use { input ->
-                val bytes = input.readBytesLimited(limit)
-                return bytes.toString(Charsets.UTF_8)
+    private suspend fun fetchText(url: String, limit: Int): String {
+        var lastError: IOException? = null
+        repeat(3) { attempt ->
+            try {
+                val connection = connect(url)
+                try {
+                    connection.inputStream.use { input ->
+                        return input.readBytesLimited(limit).toString(Charsets.UTF_8)
+                    }
+                } finally {
+                    connection.disconnect()
+                }
+            } catch (error: IOException) {
+                lastError = error
+                if (attempt < 2) delay((attempt + 1) * 750L)
             }
-        } finally {
-            connection.disconnect()
         }
+        throw lastError ?: IOException("Release request failed")
     }
 
     private fun download(url: String, destination: File, limit: Int) {
@@ -90,9 +100,14 @@ internal class ReleaseRepository(private val context: Context) {
         connection.readTimeout = 30_000
         connection.setRequestProperty("User-Agent", "nl2sh-helper")
         connection.setRequestProperty("Accept", "application/vnd.github+json")
-        check(connection.responseCode == 200) { "Release request failed: HTTP ${connection.responseCode}" }
-        require(connection.url.protocol == "https") { "Insecure release redirect" }
-        return connection
+        try {
+            check(connection.responseCode == 200) { "Release request failed: HTTP ${connection.responseCode}" }
+            require(connection.url.protocol == "https") { "Insecure release redirect" }
+            return connection
+        } catch (error: Exception) {
+            connection.disconnect()
+            throw error
+        }
     }
 }
 

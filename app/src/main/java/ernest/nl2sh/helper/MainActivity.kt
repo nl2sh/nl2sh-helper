@@ -92,8 +92,6 @@ class MainActivity : Activity() {
         }
         getSharedPreferences("connection", MODE_PRIVATE).edit().putString("host", host).putInt("port", port).apply()
         installButton.isEnabled = false
-        openButton.isEnabled = false
-        webUrl = null
         installJob = scope.launch {
             try {
                 webUrl = DeviceInstaller(applicationContext).install(host, port) { message ->
