@@ -16,11 +16,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 
 internal class DeviceInstaller(private val context: Context) {
-    suspend fun install(host: String, port: Int, report: suspend (String) -> Unit): String = withContext(Dispatchers.IO) {
+    suspend fun install(host: String, port: Int, wireless: Boolean, report: suspend (String) -> Unit): String = withContext(Dispatchers.IO) {
         val client = DefaultAdbClient.factory(context).create()
         try {
             report("连接目标设备…首次连接请在目标设备批准 ADB 授权")
-            withTimeout(45_000) { client.connect(AdbEndpoint(host, port)) }
+            withTimeout(45_000) {
+                if (wireless) client.connectWireless(AdbEndpoint(host, port))
+                else client.connect(AdbEndpoint(host, port))
+            }
             check(!portOpen(host) || isRunning(client)) { "目标设备 9999 端口已被其他服务占用" }
             report("检测目标设备架构…")
             val abiOutput = runChecked(client, "getprop ro.product.cpu.abilist")
