@@ -1,3 +1,5 @@
+[简体中文](README.md) | [English](README_EN.md)
+
 # nl2sh 助手
 
 Android 应用，使用独立的 [ADB 库](https://github.com/Ernest-su/adb) 通过 TCP ADB 或 Android 11+ 无线调试连接目标设备，部署 [nl2sh](https://github.com/nl2sh/nl2sh) 最新 GitHub Release，并让 Web 界面在目标设备后台运行。
@@ -22,3 +24,5 @@ Android 应用，使用独立的 [ADB 库](https://github.com/Ernest-su/adb) 通
 ```
 
 Android 包名：`ernest.nl2sh.helper`。ADB 依赖由 Gradle 从 JitPack 的固定 `v0.3.0` 版本获取。
+
+[完整连接、部署与排障指南](docs/zh/guide.md)
