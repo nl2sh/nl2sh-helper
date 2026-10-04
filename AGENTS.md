@@ -8,9 +8,9 @@ nl2sh助手是独立的 Android ADB 客户端、nl2sh 安装器和 Web 启动器
 
 ## 视觉规范是强约束
 
-任何界面、主题、文案布局或控件改动前必须完整阅读 [UI_DESIGN.md](UI_DESIGN.md)，并检查 `HelperUi.kt`、`res/values/colors.xml`、`res/values/themes.xml` 和 AndroidManifest。助手必须保持与 nl2sh TUI/Web 一致的深色语义 palette，不得恢复浅色系统主题或各自硬编码业务颜色。
+任何界面、主题、文案布局或控件改动前必须完整阅读 [UI_DESIGN.md](UI_DESIGN.md)，并检查 `Nl2shTheme.kt`、`res/values/colors.xml`、`res/values/themes.xml` 和 AndroidManifest。助手必须保持与 nl2sh TUI/Web 一致的深色语义 palette，不得恢复浅色系统主题或各自硬编码业务颜色。
 
-- `colors.xml` 是唯一业务颜色源，`HelperUi` 是程序化原生控件样式入口；新增组件引用已有语义 token。禁止在 Activity 中新增 `Color.rgb`、`Color.parseColor` 或业务 hex 常量。
+- `colors.xml` 是唯一业务颜色源，`Nl2shTheme` 是 Compose 主题入口；新增组件引用已有语义 token。禁止在 Activity 中新增 `Color.rgb`、`Color.parseColor` 或业务 hex 常量。
 - 品牌图标、二维码黑白与透明遮罩是 UI_DESIGN 明确列出的例外，不能据此改成白底页面或纯黑大面积背景。
 - accent 表示导航/焦点，cyan 表示分区，success/warning/error 只表达真实结果/注意事项/错误。长正文和状态详情保持中性，不能整段染绿或染红。
 - 选中连接方式用 selected、边框、`✓` 和无障碍说明表达，不能用 disabled 伪装选中。处理中、取消、失败、保存地址和已验证成功分别保留真实状态和文字，不根据消息关键词推测状态。

@@ -6,6 +6,10 @@
 
 Android 应用，使用独立的 [ADB 库](https://github.com/Ernest-su/adb) 通过 TCP ADB 或 Android 11+ 无线调试连接目标设备，部署 [nl2sh](https://github.com/nl2sh/nl2sh) 最新 GitHub Release，并让 Web 界面在目标设备后台运行。
 
+界面使用 Jetpack Compose，并遵循 nl2sh Web 的暗色视觉规范，详见
+[`docs/zh/design.md`](docs/zh/design.md) 和 [`UI_DESIGN.md`](UI_DESIGN.md)。连接和部署诊断写入 Android logcat，
+可使用 `adb logcat -s Nl2shHelper Nl2shInstaller` 查看（包括底层异常原因）。
+
 ## 使用
 
 1. 选择连接方式：TCP ADB 输入设备地址和端口；无线调试配对码输入目标设备显示的临时配对地址、端口和六位码；二维码方式让目标设备在同一 Wi-Fi 网络扫描助手显示的二维码。无线调试需要在目标设备的开发者选项中开启。

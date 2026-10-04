@@ -10,7 +10,7 @@ History is grouped by connection method. Long addresses and GUIDs wrap, with con
 
 The screen supports system font scaling and scrolling on narrow displays, stacking connection methods vertically at larger font sizes, with touch targets of at least 48dp. Opening the app does not automatically show the keyboard. The network notice retains the warning that the target Web UI requires no login and should only be used on a trusted network. The browser-based nl2sh interface is maintained by the nl2sh project.
 
-Contributors must read [UI_DESIGN.md](../../UI_DESIGN.md) and [AGENTS.md](../../AGENTS.md) before interface changes. Colors live in `colors.xml`; `themes.xml` and `HelperUi.kt` manage the theme and native widgets.
+Contributors must read [UI_DESIGN.md](../../UI_DESIGN.md) and [AGENTS.md](../../AGENTS.md) before interface changes. The UI uses Jetpack Compose; colors live in `colors.xml`, while `themes.xml` and `Nl2shTheme.kt` manage the window and Compose semantic themes.
 
 ## Screen examples
 

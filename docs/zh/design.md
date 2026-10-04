@@ -10,7 +10,7 @@
 
 界面支持系统字体缩放和窄屏滚动，窄屏使用较大字体时连接方式自动纵排；按钮触摸区域至少 48dp；首次打开不弹出键盘。网络提示保留 Web 无需登录、仅在可信网络使用的说明。浏览器内打开的 nl2sh Web 由 nl2sh 项目维护。
 
-贡献者改动界面前必须阅读仓库根目录 [UI_DESIGN.md](../../UI_DESIGN.md) 和 [AGENTS.md](../../AGENTS.md)。色值集中在 `colors.xml`，主题与原生控件样式由 `themes.xml` 和 `HelperUi.kt` 管理。
+贡献者改动界面前必须阅读仓库根目录 [UI_DESIGN.md](../../UI_DESIGN.md) 和 [AGENTS.md](../../AGENTS.md)。界面使用 Jetpack Compose；色值集中在 `colors.xml`，窗口主题和 Compose 语义主题分别由 `themes.xml` 与 `Nl2shTheme.kt` 管理。
 
 ## 界面示例
 

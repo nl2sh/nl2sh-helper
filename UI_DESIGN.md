@@ -8,7 +8,7 @@
 
 ## 唯一语义色板
 
-色值只声明在 `app/src/main/res/values/colors.xml`。`themes.xml` 管理窗口和系统控件，`HelperUi.kt` 封装原生控件状态，`MainActivity.kt` 引用语义 token，不定义 RGB、hex 或 ANSI 业务颜色。
+色值只声明在 `app/src/main/res/values/colors.xml`。`themes.xml` 管理窗口和系统控件，`Nl2shTheme.kt` 将语义 token 映射到 Compose Material 主题，`MainActivity.kt` 引用语义 token，不定义 RGB、hex 或 ANSI 业务颜色。
 
 | Token / Android resource | 色值 | 语义 |
 |---|---|---|
@@ -79,7 +79,7 @@
 
 ## 验收与维护
 
-1. 检查 colors.xml 全部语义色与 nl2sh palette 一致，MainActivity 中不出现散落业务颜色。
+1. 检查 colors.xml 全部语义色与 nl2sh palette 一致，Nl2shTheme 只从资源读取颜色，MainActivity 中不出现散落业务颜色。
 2. 执行 `./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:lintRelease :app:assembleDebug :app:assembleRelease`。有密钥时额外用 SDK apksigner 验证 release；不得提交签名凭据。
 3. 在 API 26+ 模拟器/设备检查 TCP、配对码、二维码及取消、输入失败、处理中、历史空态与已保存地址。真实连接成功/失败必须基于实际操作检查，不能用模拟器界面测试冒充真实部署验收。
 4. 检查 320dp 窄屏、正常屏幕、横屏与系统字体 1.3/2.0：文字不裁切、可滚动、按钮可点、错误可读，初始键盘不自动出现。
