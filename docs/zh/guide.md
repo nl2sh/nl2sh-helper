@@ -19,10 +19,10 @@
 1. 连接（上限 45 秒），读取目标 ABI 列表，优先选择 `arm64-v8a`，其次 `armeabi-v7a`。安装器不支持 x86/x86_64 发布程序。
 2. 查询 GitHub 的 `nl2sh/nl2sh` 最新 Release，要求同时存在 `nl2sh-android-ABI` 和 `.sha256` 资产，通过 HTTPS 下载。不提供版本选择或 Gitee 回退。
 3. 缓存命中也重新获取摘要；应用私有缓存中的程序只有复算一致才复用。程序上限 32,000,000 bytes，元数据 512 KiB，摘要文件 1024 bytes。文本请求遇到 I/O 错误最多尝试三次，不代表自动重试整个部署。
-4. 比较目标程序摘要，不一致时上传为 `nl2sh.download`，修改执行权限、重命名为 `nl2sh`，再校验设备摘要，并核对 `--version` 与 Release 标签。
-5. 只有 `/proc/PID/exe` 匹配受管程序路径时才停止 `helper.pid` 记录的进程；遇到冲突的 9999 端口报错。通过 `nohup ./nl2sh --web-only` 启动，保存 `helper.pid` 和 `nl2sh-web.log`，检查进程及 `/api/sessions` 后才报告成功。
+4. 比较目标程序摘要，不一致时上传为 `/data/local/tmp/nl2sh.download`，修改执行权限、重命名为 `/data/local/tmp/nl2sh`，再校验设备摘要，并核对 `--version` 与 Release 标签。
+5. 只有 `/proc/PID/exe` 匹配受管程序路径时才停止 `helper.pid` 记录的进程；遇到冲突的 9999 端口报错。通过 `nohup /data/local/tmp/nl2sh --web-only` 启动，在助手目录保存 `helper.pid` 和 `nl2sh-web.log`，检查进程及 `/api/sessions`。首次未通过检查时停止残留进程并自动重试一次；两次均失败时报告每次的 PID、存活状态、可执行文件路径和日志尾部。
 
-受管文件位于 `/data/local/tmp/nl2sh-helper/`。启动器不传 `--config`，由 nl2sh 自身按默认规则查找配置，也不提供 API Key。在控制端浏览器打开返回的 `http://目标IP:9999/`，配置模型并使用 Agent。历史重连也会检查/安装最新版本并重启受管服务。
+程序位于 nl2sh 默认推送位置 `/data/local/tmp/nl2sh`；助手自己的 `helper.pid` 和 `nl2sh-web.log` 位于 `/data/local/tmp/nl2sh-helper/`。升级成功后会清理旧版助手目录内的程序。启动器不传 `--config`，由 nl2sh 自身按默认规则查找配置，也不提供 API Key。在控制端浏览器打开返回的 `http://目标IP:9999/`，配置模型并使用 Agent。历史重连也会检查/安装最新版本并重启受管服务。
 
 ## 权限与排障
 

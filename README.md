@@ -19,7 +19,7 @@ Android 应用，使用独立的 [ADB 库](https://github.com/Ernest-su/adb) 通
 
 成功的 TCP、配对码和二维码连接分别保存在历史设备列表中。点击历史设备的“连接”会重新安装并启动；无线调试先按设备 GUID 发现当前连接端口，发现失败时尝试上次地址。配对码和二维码密码不保存。
 
-目标 Web 服务当前监听所有 IPv4 接口且无需登录；仅在可信网络使用。助手管理 `/data/local/tmp/nl2sh-helper/` 内的程序、日志和 PID 文件，不修改设备上其他 nl2sh 安装。目标必须允许 shell 用户在该目录执行程序。助手不自动配置模型 API Key，可在打开的 Web 界面完成设置。
+目标 Web 服务当前监听所有 IPv4 接口且无需登录；仅在可信网络使用。助手将程序部署到 nl2sh 默认位置 `/data/local/tmp/nl2sh`，并在 `/data/local/tmp/nl2sh-helper/` 保存日志和 PID 文件。目标必须允许 shell 用户从 `/data/local/tmp` 执行程序。助手不自动配置模型 API Key，可在打开的 Web 界面完成设置。
 
 ## 构建
 
