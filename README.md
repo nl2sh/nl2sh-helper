@@ -1,6 +1,8 @@
 [简体中文](README.md) | [English](README_EN.md)
 
-# nl2sh 助手
+# nl2sh助手
+
+<img src="assets/icon.png" width="128" alt="nl2sh助手图标">
 
 Android 应用，使用独立的 [ADB 库](https://github.com/Ernest-su/adb) 通过 TCP ADB 或 Android 11+ 无线调试连接目标设备，部署 [nl2sh](https://github.com/nl2sh/nl2sh) 最新 GitHub Release，并让 Web 界面在目标设备后台运行。
 

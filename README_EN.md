@@ -1,5 +1,7 @@
 # nl2sh Helper
 
+<img src="assets/icon.png" width="128" alt="nl2sh助手图标">
+
 [简体中文](README.md) | [English](README_EN.md)
 
 Android API 26+ ADB installer and browser launcher for [nl2sh](https://github.com/nl2sh/nl2sh). Connect by TCP ADB or Android 11+ wireless pairing code/QR, verify the latest ARM64/ARMv7 release with SHA-256, and launch the target Web UI in the background. Successful connections are saved without pairing secrets.

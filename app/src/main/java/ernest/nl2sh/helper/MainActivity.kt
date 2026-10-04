@@ -61,7 +61,7 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.rgb(247, 249, 251))
         }
         setContentView(ScrollView(this).apply { addView(root) })
-        root.addView(label("nl2sh 助手", 27, Color.rgb(25, 54, 80), 0))
+        root.addView(label(getString(R.string.app_name), 27, Color.rgb(25, 54, 80), 0))
         root.addView(label("连接目标 Android 设备，自动安装最新 nl2sh 并启动 Web 界面。", 16, Color.DKGRAY, 12))
         root.addView(label("选择连接方式", 20, Color.rgb(25, 54, 80), 28))
         val modeRow = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
