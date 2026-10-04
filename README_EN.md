@@ -17,3 +17,5 @@ Build with JDK 17 and Android SDK 36:
 [Connection, deployment and troubleshooting guide](docs/en/guide.md)
 
 [Signed builds and GitHub Releases](docs/en/releasing.md)
+
+[Interface and visual conventions](docs/en/design.md) · [Contributor design contract](UI_DESIGN.md)

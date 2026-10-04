@@ -2,6 +2,10 @@
 
 助手是 Android ADB 客户端和 Web 启动器，与无障碍/键盘伴侣 [android-bridge](https://github.com/nl2sh/android-bridge) 及 [JADX helper](https://github.com/nl2sh/jadx-helper) 分开维护，不包含模型 Agent 或 A2A/MCP 网关。控制端需要 Android API 26+；目标设备需要 ARM64 或 ARMv7 发布程序，并允许从 `/data/local/tmp` 执行。
 
+## 界面
+
+连接方式、状态和历史遵循 nl2sh 深色语义视觉规范，详见[界面与视觉规范](design.md)。当前方式以勾号标识，处理中禁用重复操作；状态详情和错误均可换行、滚动。
+
 ## 连接
 
 - **TCP ADB：**输入目标地址和 ADB 连接端口。需要事先自行开启 TCP ADB；助手不会代为开启。首次连接在目标设备批准 RSA 授权。

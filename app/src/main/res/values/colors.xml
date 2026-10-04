@@ -1,3 +1,18 @@
 <resources>
+    <!-- Brand artwork is separate from semantic UI colors. -->
     <color name="ic_launcher_background">#001139</color>
+    <!-- Match nl2sh/UI_DESIGN.md and web/src/style.css. -->
+    <color name="ui_background">#161B22</color>
+    <color name="ui_background_alt">#21262D</color>
+    <color name="ui_border">#3D444D</color>
+    <color name="ui_border_focus">#58A6FF</color>
+    <color name="ui_text_primary">#D8DEE9</color>
+    <color name="ui_text_secondary">#8B949E</color>
+    <color name="ui_text_muted">#6E7681</color>
+    <color name="ui_accent">#58A6FF</color>
+    <color name="ui_cyan">#56D4DD</color>
+    <color name="ui_success">#3FB950</color>
+    <color name="ui_warning">#D29922</color>
+    <color name="ui_error">#F85149</color>
+    <color name="ui_special">#BC8CFF</color>
 </resources>

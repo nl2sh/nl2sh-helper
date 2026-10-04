@@ -30,3 +30,5 @@ Android 包名：`ernest.nl2sh.helper`。ADB 依赖由 Gradle 从 JitPack 的固
 [完整连接、部署与排障指南](docs/zh/guide.md)
 
 [签名构建与 GitHub Release 发布](docs/zh/releasing.md)
+
+[界面与视觉规范](docs/zh/design.md) · [贡献者视觉约束](UI_DESIGN.md)

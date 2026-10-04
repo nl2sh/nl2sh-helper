@@ -2,6 +2,10 @@
 
 The helper is an Android ADB client and Web launcher, separate from the Accessibility/keyboard [android-bridge](https://github.com/nl2sh/android-bridge) companion and the [JADX helper](https://github.com/nl2sh/jadx-helper). It does not contain a model Agent or an A2A/MCP gateway. The controller runs Android API 26+; the target needs an ARM64 or ARMv7 nl2sh release and permission to execute from `/data/local/tmp`.
 
+## Interface
+
+Connection methods, status and history follow the shared nl2sh dark semantic design. See [Interface and visual conventions](design.md). A checkmark identifies the current mode; busy tasks disable duplicate actions. Details and errors wrap and scroll.
+
 ## Connect
 
 - **TCP ADB:** enter the target address and ADB connection port. Enable TCP ADB separately; the helper does not enable it. Approve the RSA authorization on the target on first connection.
