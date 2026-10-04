@@ -26,3 +26,5 @@ Android 应用，使用独立的 [ADB 库](https://github.com/Ernest-su/adb) 通
 Android 包名：`ernest.nl2sh.helper`。ADB 依赖由 Gradle 从 JitPack 的固定 `v0.3.0` 版本获取。
 
 [完整连接、部署与排障指南](docs/zh/guide.md)
+
+[签名构建与 GitHub Release 发布](docs/zh/releasing.md)

@@ -35,4 +35,4 @@ Manifest 申请网络与 Wi-Fi multicast 权限，允许目标 Web 的明文访�
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-应用 ID 为 `ernest.nl2sh.helper`。没有显式签名配置的 release 构建未签名，分发前需用稳定私钥签名；不要提交 `local.properties`、构建输出或签名凭据。单元测试覆盖 ABI/摘要选择及缓存复用/损坏，不验证真机配对和 Web 启动。
+应用 ID 为 `ernest.nl2sh.helper`。release 支持本地密钥配置与 GitHub Actions 签名，详见[签名构建与发布](releasing.md)；不要提交 `local.properties`、构建输出或签名凭据。单元测试覆盖 ABI/摘要选择及缓存复用/损坏，不验证真机配对和 Web 启动。

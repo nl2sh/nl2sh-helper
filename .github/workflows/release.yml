@@ -1,0 +1,93 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag, for example v0.1.0'
+        required: true
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Resolve version
+        id: version
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: python3 .github/scripts/release-version.py >> "$GITHUB_OUTPUT"
+      - name: Restore signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_BASE64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing repository secret: $name"
+              exit 1
+            fi
+          done
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nl2sh-helper-release.jks"
+      - name: Build signed release
+        env:
+          NL2SH_HELPER_KEYSTORE_FILE: ${{ runner.temp }}/nl2sh-helper-release.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          VERSION_NAME: ${{ steps.version.outputs.version }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          ./gradlew --no-daemon :app:testDebugUnitTest :app:lintRelease :app:assembleRelease \
+            "-Pnl2shHelperVersionName=$VERSION_NAME" "-Pnl2shHelperVersionCode=$VERSION_CODE"
+      - name: Verify and package APK
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/release/app-release.apk
+          test -f "$apk"
+          apksigner=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
+          test -n "$apksigner"
+          "$apksigner" verify --verbose --print-certs "$apk"
+          cp "$apk" "nl2sh-helper-$VERSION_NAME.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nl2sh-helper-${{ steps.version.outputs.version }}
+          path: nl2sh-helper-${{ steps.version.outputs.version }}.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          VERSION_NAME: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(release create "$RELEASE_TAG" "nl2sh-helper-$VERSION_NAME.apk" --verify-tag --title "nl2sh-helper $VERSION_NAME" --generate-notes)
+          if [[ "$PRERELEASE" == true ]]; then args+=(--prerelease); fi
+          gh "${args[@]}"
+      - name: Remove signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/nl2sh-helper-release.jks"

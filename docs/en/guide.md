@@ -35,4 +35,4 @@ Use JDK 17, Android SDK Platform 36, the checked-in Gradle 9.1.0 Wrapper and And
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The application ID is `ernest.nl2sh.helper`. The release build is unsigned without an explicit signing configuration; sign with a stable private key before distribution. Keep `local.properties`, build outputs and signing credentials out of Git. Unit tests cover release ABI/checksum selection and cache reuse/corruption, not real device pairing or Web startup.
+The application ID is `ernest.nl2sh.helper`. For local and GitHub Actions release signing, see [Signed builds and releases](releasing.md). Keep `local.properties`, build outputs and signing credentials out of Git. Unit tests cover release ABI/checksum selection and cache reuse/corruption, not real device pairing or Web startup.
