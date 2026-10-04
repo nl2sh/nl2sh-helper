@@ -240,9 +240,8 @@ class MainActivity : ComponentActivity() {
                 if (!code.matches(Regex("[0-9]{6}"))) { showStatus("请输入六位配对码。", StatusTone.ERROR); return }
                 runAction {
                     showStatus("正在与 ${endpoint.host}:${endpoint.port} 配对…", StatusTone.WORKING)
-                    val guid = pair(endpoint, code); pairingCode = ""
+                    val (guid, service) = pairAndDiscover(endpoint, code); pairingCode = ""
                     showStatus("已配对；正在查找无线连接服务…", StatusTone.WORKING)
-                    val service = discoverConnection(guid, 30_000)
                     if (service == null) showStatus("已配对，但未发现连接服务。请确认无线调试仍已开启，然后重试。", StatusTone.WARNING)
                     else install(ConnectionRecord(ConnectionMode.WIRELESS_CODE,
                         if (endpoint.host.isTailscaleAddress()) endpoint.host else service.host, service.port, guid))
@@ -265,6 +264,25 @@ class MainActivity : ComponentActivity() {
         try { client.pairWireless(endpoint, code) } finally { client.close() }
     }
 
+    private suspend fun pairAndDiscover(
+        endpoint: AdbEndpoint,
+        code: String,
+    ): Pair<String, QrPairingDiscovery.ResolvedService?> {
+        val connections = Channel<QrPairingDiscovery.ResolvedService>(Channel.UNLIMITED)
+        val discovery = connectionDiscovery(connections)
+        return try {
+            discovery.start()
+            val guid = pair(endpoint, code)
+            guid to awaitConnectableConnection(
+                connections, guid, 30_000,
+                routeHost = endpoint.host.takeIf(String::isTailscaleAddress),
+            )
+        } finally {
+            discovery.stop()
+            connections.close()
+        }
+    }
+
     private fun startQrPairing() {
         if (busy || qrBitmap != null) return
         val qr = QrPairing(); val connections = Channel<QrPairingDiscovery.ResolvedService>(Channel.UNLIMITED); var started = false
@@ -274,10 +292,7 @@ class MainActivity : ComponentActivity() {
                     showStatus("已扫码，正在与 ${service.host}:${service.port} 配对…", StatusTone.WORKING)
                     val guid = pair(AdbEndpoint(service.host, service.port), qr.password)
                     showStatus("已配对；正在查找无线连接服务…", StatusTone.WORKING)
-                    val connection = withTimeoutOrNull(30_000) {
-                        while (true) { val candidate = connections.receive(); if (candidate.name.contains(guid, true) || candidate.host == service.host) return@withTimeoutOrNull candidate }
-                        @Suppress("UNREACHABLE_CODE") null
-                    }
+                    val connection = awaitConnectableConnection(connections, guid, 30_000, fallbackHost = service.host)
                     if (connection == null) showStatus("已配对，但未发现无线连接服务。", StatusTone.WARNING)
                     else install(ConnectionRecord(ConnectionMode.WIRELESS_QR, connection.host, connection.port, guid))
                 } finally { stopQrPairing(false) }
@@ -299,18 +314,59 @@ class MainActivity : ComponentActivity() {
     private fun connectHistory(record: ConnectionRecord) = runAction {
         val current = if (record.mode == ConnectionMode.TCP) record else {
             showStatus("正在查找 ${record.guid} 的无线连接服务…", StatusTone.WORKING)
-            discoverConnection(record.guid, 10_000)?.let { record.copy(host = if (record.host.isTailscaleAddress()) record.host else it.host, port = it.port) } ?: record
+            discoverConnection(
+                record.guid, 10_000,
+                routeHost = record.host.takeIf(String::isTailscaleAddress),
+            )?.let { record.copy(host = if (record.host.isTailscaleAddress()) record.host else it.host, port = it.port) } ?: record
         }
         install(current)
     }
 
-    private suspend fun discoverConnection(guid: String, timeout: Long): QrPairingDiscovery.ResolvedService? {
+    private suspend fun discoverConnection(
+        guid: String,
+        timeout: Long,
+        routeHost: String? = null,
+    ): QrPairingDiscovery.ResolvedService? {
         val connections = Channel<QrPairingDiscovery.ResolvedService>(Channel.UNLIMITED)
-        val discovery = QrPairingDiscovery(this, null, {}, { connections.trySend(it) }, { Log.e("Nl2shHelper", "NSD discovery failed: $it") })
-        return try { discovery.start(); withTimeoutOrNull(timeout) {
-            while (true) { val service = connections.receive(); if (service.name.contains(guid, true)) return@withTimeoutOrNull service }
-            @Suppress("UNREACHABLE_CODE") null
-        } } finally { discovery.stop(); connections.close() }
+        val discovery = connectionDiscovery(connections)
+        return try {
+            discovery.start()
+            awaitConnectableConnection(connections, guid, timeout, routeHost = routeHost)
+        } finally { discovery.stop(); connections.close() }
+    }
+
+    private fun connectionDiscovery(connections: Channel<QrPairingDiscovery.ResolvedService>) =
+        QrPairingDiscovery(this, null, {}, { connections.trySend(it) }, {
+            Log.e("Nl2shHelper", "NSD discovery failed: $it")
+        })
+
+    private suspend fun awaitConnectableConnection(
+        connections: Channel<QrPairingDiscovery.ResolvedService>,
+        guid: String,
+        timeout: Long,
+        fallbackHost: String? = null,
+        routeHost: String? = null,
+    ): QrPairingDiscovery.ResolvedService? = withTimeoutOrNull(timeout) {
+        firstReachableWirelessService(
+            connections,
+            matches = { it.name.contains(guid, true) || it.host == fallbackHost },
+        ) { candidate ->
+            val endpoint = AdbEndpoint(routeHost ?: candidate.host, candidate.port)
+            probeWireless(endpoint).also { reachable ->
+                if (!reachable) Log.w("Nl2shHelper", "Ignoring unreachable wireless ADB service ${candidate.name} at ${endpoint.serial}")
+            }
+        }
+    }
+
+    private suspend fun probeWireless(endpoint: AdbEndpoint): Boolean = withContext(Dispatchers.IO) {
+        val client = DefaultAdbClient.factory(applicationContext).create()
+        try {
+            withTimeout(10_000) { client.connectWireless(endpoint) }
+            true
+        } catch (error: Exception) {
+            Log.w("Nl2shHelper", "Wireless ADB probe failed for ${endpoint.serial}", error)
+            false
+        } finally { client.close() }
     }
 
     private suspend fun install(record: ConnectionRecord) {

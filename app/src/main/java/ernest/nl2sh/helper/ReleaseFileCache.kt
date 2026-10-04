@@ -1,6 +1,9 @@
 package ernest.nl2sh.helper
 
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /** Stores a verified binary by release and ABI, downloading only when absent or corrupt. */
 internal class ReleaseFileCache(private val root: File) {
@@ -15,7 +18,12 @@ internal class ReleaseFileCache(private val root: File) {
         try {
             download(temp)
             check(sha256(temp) == expectedSha) { "Downloaded nl2sh SHA-256 mismatch" }
-            check(temp.renameTo(destination)) { "Cannot save cached nl2sh" }
+            try {
+                Files.move(temp.toPath(), destination.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temp.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
         } finally {
             temp.delete()
         }
