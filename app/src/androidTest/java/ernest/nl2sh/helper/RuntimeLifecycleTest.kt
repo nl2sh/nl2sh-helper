@@ -61,6 +61,9 @@ class RuntimeLifecycleTest {
         assertEquals(version, ready.getString("version"))
         assertEquals("nl2sh-helper", ready.getJSONObject("update_ownership").getString("owner"))
         assertFalse(ready.getJSONObject("update_ownership").getBoolean("self_update_allowed"))
+        upgraded.perform(host, adbPort, false, DeviceAction.UPDATE) { }
+        assertEquals(ready.getLong("pid"), info().getLong("pid"))
+        assertEquals("nl2sh-helper", info().getJSONObject("update_ownership").getString("owner"))
         connect.perform(host, adbPort, false, DeviceAction.CONNECT) { }
         assertEquals(ready.getLong("pid"), info().getLong("pid"))
     }

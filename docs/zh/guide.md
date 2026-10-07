@@ -80,3 +80,5 @@ adb shell am instrument -w -r -e class ernest.nl2sh.helper.RuntimeLifecycleTest 
 扩展诊断同时显示通过 PID/版本/实际端口验证的 `/api/info` 中的 JADX、Tailcat 与更新归属；无法核验时显示未知。API 26 真实 Bridge 管理回归、18 项单元测试和 debug/release 构建/lint 通过；界面覆盖正常竖屏、320dp/两倍字体确认框、窄横屏底部动作。旋转保留所选目标但清除过期诊断，长确认正文可滚动。
 
 ![Bridge 与扩展诊断，未认证的推荐版本显示未知](../assets/ui-bridge.png)
+
+显式更新时，即使已认证目标二进制摘要相同，也登记 Helper 管理归属；复用健康服务，不推送文件或重启。普通连接不改变安装归属。

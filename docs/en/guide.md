@@ -80,3 +80,5 @@ For a disposable emulator, prepare assets with `scripts/prepare-runtime-fixtures
 Extension diagnostics also show JADX, Tailcat and update ownership from `/api/info` after checking PID/version/actual port. Unverified status stays unknown. API 26 Bridge management regression, 18 unit tests and debug/release assembly/lint passed. UI checks cover normal portrait, 320dp/two-times-font confirmation and narrow landscape actions. Rotation keeps the selected target while clearing stale diagnostics; long confirmation text scrolls.
 
 ![Bridge and extension diagnostics; unauthenticated recommendations stay unknown](../assets/ui-bridge.png)
+
+An explicit update also records Helper ownership when the authenticated target binary already matches. It reuses the healthy service without pushing the file or restarting; ordinary Connect never changes ownership.

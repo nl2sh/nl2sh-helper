@@ -102,7 +102,8 @@ internal class DeviceInstaller(private val context: Context,
         val originalVersion = if (installed) installedVersion(client) else null
         if (originalSha == expectedSha) {
             check(originalVersion == expectedVersion) { "设备版本与已校验发布不一致。" }
-            report("已是目标版本，摘要一致；不推送或重启。")
+            writeOwner(client, expectedVersion, expectedSha)
+            report("已是目标版本，摘要一致；已确认 Helper 管理归属，不推送或重启。")
             return connectExisting(client, host, report)
         }
         runChecked(client, "mkdir -p $REMOTE_DIR")
