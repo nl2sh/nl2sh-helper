@@ -24,6 +24,8 @@ if len(header) != 20 or header[:6] != b'\x7fELF\x02\x01' or int.from_bytes(heade
 output = Path(__file__).resolve().parent.parent / 'app/build/runtime-fixtures'
 output.mkdir(parents=True, exist_ok=True)
 shutil.copyfile(args.runtime, output / 'good-runtime')
+for fixture in (Path(__file__).resolve().parent.parent / 'app/src/test/resources/signatures').glob('*'):
+    shutil.copyfile(fixture, output / fixture.name)
 source = r'''fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|v| v == "--version") { println!("nl2sh 9.9.9"); }

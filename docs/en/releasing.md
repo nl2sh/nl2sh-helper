@@ -56,6 +56,8 @@ git push origin v0.1.0
 
 Watch Actions → Release and download `nl2sh-helper-0.1.0.apk` from GitHub Releases. Manual dispatch accepts an existing **full tag**, such as `v0.1.0`, and checks out that tag. An already published release cannot be created again; use a new tag for the next version.
 
-`versionName` removes the leading `v`. `versionCode = MAJOR * 10000 + MINOR * 100 + PATCH`, matching ascrcpy. No leading zeros; minor and patch < 100, major < 210000; `v0.0.0` is rejected. Suffixes such as `-rc1` create prereleases but share the same code as the corresponding stable version. Choose a higher three-part version for upgrades, and always exceed previously distributed version codes. Local defaults remain `0.1.0` / `1`; pass both Gradle version overrides for a release.
+`versionName` removes the leading `v`. `versionCode = MAJOR * 10000 + MINOR * 100 + PATCH`, matching ascrcpy. No leading zeros; minor and patch < 100, major < 210000; `v0.0.0` is rejected. Suffixes such as `-rc1` create prereleases but share the same code as the corresponding stable version. Choose a higher three-part version for upgrades, and always exceed previously distributed version codes. Local defaults are `0.2.0` / `200`; pass both Gradle version overrides for a release.
 
 Release runs unit tests and release lint, and requires successful apksigner verification before publication. Missing secrets or invalid signatures prevent publication.
+
+Runtime release order: publish the selected Bridge/JADX versions, publish the native release with its signed manifest, then distribute Helper meeting the minimum version. The production GPG private key stays in the native Actions signing environment; Helper packages only the public key. Local production signing may be deferred.

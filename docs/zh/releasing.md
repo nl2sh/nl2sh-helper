@@ -74,6 +74,8 @@ git push origin v0.1.0
 
 在 Actions 查看 `Release`，成功后下载 GitHub Release 中的 `nl2sh-helper-0.1.0.apk`。也可手动运行 `Release`，填写**已存在的完整标签**（如 `v0.1.0`）；工作流检出这个标签。不要重新运行已成功发布的同一标签：已有 Release 会让创建步骤失败；需要新版本时创建新标签。
 
-版本规则沿用 ascrcpy：`versionName` 为去掉 `v` 的标签，`versionCode = MAJOR * 10000 + MINOR * 100 + PATCH`。三段数字不得含前导零，MINOR/PATCH < 100，MAJOR < 210000，不接受 `v0.0.0`。后缀如 `-rc1` 创建预发布，但与同一三段版本的正式版共用 versionCode；正式升级应选更大的三段版本。每次发布确保 versionCode 比已分发版本更大。本地默认仍为 `0.1.0` / `1`，发布应显式传入与标签对应的两个 Gradle 参数。
+版本规则沿用 ascrcpy：`versionName` 为去掉 `v` 的标签，`versionCode = MAJOR * 10000 + MINOR * 100 + PATCH`。三段数字不得含前导零，MINOR/PATCH < 100，MAJOR < 210000，不接受 `v0.0.0`。后缀如 `-rc1` 创建预发布，但与同一三段版本的正式版共用 versionCode；正式升级应选更大的三段版本。每次发布确保 versionCode 比已分发版本更大。本地默认为 `0.2.0` / `200`，发布应显式传入与标签对应的两个 Gradle 参数。
 
 工作流在发布前运行单元测试、release lint，并强制用 apksigner 校验签名；缺少 Secret 或签名无效时不会发布 APK。
+
+运行时发布顺序：先发布 Bridge/JADX 指定版本，再发布带签名 Manifest 的原生版本，最后分发匹配最低版本要求的助手。生产 GPG 私钥仅保留在原生 GitHub Actions 签名环境；助手内仅打包公钥。本地可暂缓生产签名。

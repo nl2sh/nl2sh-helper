@@ -64,3 +64,7 @@ adb shell am instrument -w -r -e class ernest.nl2sh.helper.RuntimeLifecycleTest 
 ```
 
 Preparation requires ANDROID_NDK_HOME/ANDROID_NDK_ROOT, rustc, and the x86_64-linux-android target. Fixtures stay in ignored app/build output and are excluded from production APKs. The controller must reach the actual service port through its configured Web route.
+
+Release downloads authenticate the compatibility manifest first, then verify the native asset SHA-256, exact size and detached GPG signature. The pinned public-key fingerprint is `5230D3A7CCBEED4616D39C51FC6AD1BC63F7D4D8`; network responses cannot replace it. The manifest requires a compatible Helper version and service protocol. Unsigned releases cannot be newly installed or upgraded. Healthy installed services remain connectable without querying releases.
+
+Signature validation: 18 unit tests and debug/release assembly/lint passed. API 26 device tests cover the pinned key, authenticated signature fixture, tamper and manifest URL drift rejection, plus connection reuse and failed upgrade rollback. Production signing runs in the release workflow and may be deferred locally.

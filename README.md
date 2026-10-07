@@ -13,7 +13,7 @@ Android 应用，使用独立的 [ADB 库](https://github.com/Ernest-su/adb) 通
 ## 使用
 
 1. 选择连接方式：TCP ADB 输入设备地址和端口；无线调试配对码输入目标设备显示的临时配对地址、端口和六位码；二维码方式让目标设备在同一 Wi-Fi 网络扫描助手显示的二维码。无线调试需要在目标设备的开发者选项中开启。
-2. 首次安装或显式更新时，助手读取目标 ABI，选择 `x86_64`、`arm64-v8a` 或 `armeabi-v7a` 的最新发布二进制及其 SHA-256 文件。首次 TCP 连接需在目标设备批准 RSA 授权。
+2. 首次安装或显式更新时，助手读取目标 ABI，选择 `x86_64`、`arm64-v8a` 或 `armeabi-v7a` 的最新发布二进制及其签名 Manifest。首次 TCP 连接需在目标设备批准 RSA 授权。
 3. 相同版本、ABI 且摘要正确的文件使用应用私有缓存，不重复下载。助手校验设备上程序的摘要，相同时也不重复推送。
 4. 启动成功后点击“在浏览器中打开”，由本机系统浏览器访问 返回的实际 Web 地址。控制设备必须能访问目标设备的 实际 Web 端口。
 
@@ -36,3 +36,5 @@ Android 包名：`ernest.nl2sh.helper`。ADB 依赖由 Gradle 从 JitPack 的固
 [签名构建与 GitHub Release 发布](docs/zh/releasing.md)
 
 [界面与视觉规范](docs/zh/design.md) · [贡献者视觉约束](UI_DESIGN.md)
+
+发布下载先验证签名兼容性 Manifest，再验证原生资产的 SHA-256、精确大小与独立 GPG 签名。公钥指纹固定为 `5230D3A7CCBEED4616D39C51FC6AD1BC63F7D4D8`，网络不能替换信任根。Manifest 要求助手版本与 service 协议兼容；无签名发布不能用于新安装或显式升级。已安装健康服务仍可连接，不查询发布。

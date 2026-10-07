@@ -21,3 +21,5 @@ Build with JDK 17 and Android SDK 36:
 [Interface and visual conventions](docs/en/design.md) · [Contributor design contract](UI_DESIGN.md)
 
 Connecting reuses a healthy installation. Separate controls check updates, restart, or stop; URLs use the actual native service port. Updates preserve a verified previous binary and attempt rollback on failure. See the [guide](docs/en/guide.md) for legacy compatibility and recovery.
+
+Release downloads authenticate the compatibility manifest first, then verify the native asset SHA-256, exact size and detached GPG signature. The pinned public-key fingerprint is `5230D3A7CCBEED4616D39C51FC6AD1BC63F7D4D8`; network responses cannot replace it. The manifest requires a compatible Helper version and service protocol. Unsigned releases cannot be newly installed or upgraded. Healthy installed services remain connectable without querying releases.

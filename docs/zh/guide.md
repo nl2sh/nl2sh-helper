@@ -64,3 +64,7 @@ adb shell am instrument -w -r -e class ernest.nl2sh.helper.RuntimeLifecycleTest 
 ```
 
 准备脚本要求 ANDROID_NDK_HOME/ANDROID_NDK_ROOT、rustc 及 x86_64-linux-android target；fixture 仅在忽略的 app/build 内，正式 APK 不包含它们。Web 路由必须允许控制端访问服务实际端口。
+
+发布下载先验证签名兼容性 Manifest，再验证原生资产的 SHA-256、精确大小与独立 GPG 签名。公钥指纹固定为 `5230D3A7CCBEED4616D39C51FC6AD1BC63F7D4D8`，网络不能替换信任根。Manifest 要求助手版本与 service 协议兼容；无签名发布不能用于新安装或显式升级。已安装健康服务仍可连接，不查询发布。
+
+签名消费验证：18 项单元测试及 debug/release 构建、lint 通过；API 26 真实设备测试覆盖固定公钥、签名夹具认证、内容篡改拒绝、Manifest URL 漂移拒绝，以及原有连接复用和失败升级回滚。生产签名由发布工作流执行，本地可暂缓。

@@ -28,7 +28,7 @@ val releaseVersionCode = providers.gradleProperty("nl2shHelperVersionCode").orNu
     requireNotNull(it.toIntOrNull()?.takeIf { code -> code in 1..2100000000 }) {
         "nl2shHelperVersionCode must be an integer between 1 and 2100000000"
     }
-} ?: 1
+} ?: 200
 
 android {
     namespace = "ernest.nl2sh.helper"
@@ -39,7 +39,7 @@ android {
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionCode = releaseVersionCode
-        versionName = providers.gradleProperty("nl2shHelperVersionName").orNull ?: "0.1.0"
+        versionName = providers.gradleProperty("nl2shHelperVersionName").orNull ?: "0.2.0"
     }
     sourceSets.getByName("androidTest").assets.srcDir(layout.buildDirectory.dir("runtime-fixtures").get().asFile)
     signingConfigs {
@@ -67,6 +67,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -83,6 +84,9 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-text")
     implementation("com.github.Ernest-su:adb:v0.3.0")
+    implementation("org.bouncycastle:bcpg-jdk18on:1.82")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.82")
+    implementation("org.bouncycastle:bcutil-jdk18on:1.82")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.google.zxing:core:3.5.4")
     testImplementation("junit:junit:4.13.2")
