@@ -9,7 +9,7 @@ import java.nio.file.StandardCopyOption
 internal class ReleaseFileCache(private val root: File) {
     fun getOrDownload(release: ReleaseBinary, expectedSha: String, download: (File) -> Unit): File {
         require(release.tag.matches(Regex("[A-Za-z0-9._-]{1,64}")))
-        require(release.abi == "arm64-v8a" || release.abi == "armeabi-v7a")
+        require(release.abi in setOf("arm64-v8a", "armeabi-v7a", "x86_64"))
         val destination = File(root, "${release.tag}/${release.abi}/nl2sh")
         if (destination.isFile && sha256(destination) == expectedSha) return destination
         val directory = requireNotNull(destination.parentFile)

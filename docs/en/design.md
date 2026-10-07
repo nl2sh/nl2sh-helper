@@ -4,7 +4,7 @@ The helper uses the same dark surfaces, neutral text and cyan/blue hierarchy as 
 
 TCP ADB, pairing code and QR code buttons identify the current connection method with a checkmark and blue outline. Code and QR modes both use Android wireless debugging. Selection is separate from availability: switching, input and deployment are disabled only while a task is running, with an explicit busy label.
 
-The status panel distinguishes ready, working, started, attention and failed states (currently labelled in Chinese). Blue indicates work in progress, green only a verified successful start, amber a warning and red an error. Details remain neutral and labels convey the result without relying on color. Deployment explicitly reports upload, target verification, version verification, startup and retry stages; if both startup attempts fail, it shows process state and the log tail. Successful pairing without a discovered connection service shows an attention state. A saved previous URL does not prove the service is currently online.
+The status panel distinguishes ready, working, started, attention and failed states (currently labelled in Chinese). Blue indicates work in progress, green only a verified successful start, amber a warning and red an error. Details remain neutral and labels convey the result without relying on color. Deployment explicitly reports reuse, staging checks, backup, startup, and restoration; errors state whether rollback completed. Successful pairing without a discovered connection service shows an attention state. A saved previous URL does not prove the service is currently online.
 
 History is grouped by connection method. Long addresses and GUIDs wrap, with connect/delete actions below the details. Deleting a record does not revoke device authorization. QR dialogs are dark, but the QR image retains black/white contrast and its complete quiet zone. Cancellation stops discovery and reports the cancelled state.
 
@@ -14,8 +14,10 @@ Contributors must read [UI_DESIGN.md](../../UI_DESIGN.md) and [AGENTS.md](../../
 
 ## Screen examples
 
-These show two scroll positions on a 320dp display, without a connected target device.
+These show two scroll positions on a 320dp display, before verifying a target in the current session.
 
-| Connection form | Status and history |
+| Connection form | Status and service management |
 |---|---|
-| ![Connection form](../assets/ui-tcp.png) | ![Status and history](../assets/ui-status.png) |
+| ![Connection form](../assets/ui-tcp.png) | ![Status and service management](../assets/ui-status.png) |
+
+Service management stacks Check updates, Restart, and Stop vertically, enabled after connecting. Dark confirmation dialogs explain effects. Stopping returns to ready; legacy service compatibility shows attention.

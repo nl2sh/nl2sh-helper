@@ -47,6 +47,8 @@ class MainActivity : ComponentActivity() {
     private var status by mutableStateOf(UiStatus(StatusTone.IDLE, ""))
     private var records by mutableStateOf(emptyList<ConnectionRecord>())
     private var webUrl by mutableStateOf<String?>(null)
+    private var connectedRecord by mutableStateOf<ConnectionRecord?>(null)
+    private var pendingDeviceAction by mutableStateOf<DeviceAction?>(null)
     private var busy by mutableStateOf(false)
     private var qrBitmap by mutableStateOf<Bitmap?>(null)
     private var activeJob: Job? = null
@@ -85,6 +87,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.padding(top = 12.dp))
                 ConnectionCard()
                 StatusCard()
+                ServiceCard()
                 HistoryCard()
                 ActionButton("在浏览器中打开 nl2sh", webUrl != null, Modifier.padding(top = 16.dp)) {
                     webUrl?.let { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
@@ -97,6 +100,35 @@ class MainActivity : ComponentActivity() {
             }
         }
         qrBitmap?.let { QrDialog(it) }
+        pendingDeviceAction?.let { action ->
+            val title = when (action) {
+                DeviceAction.UPDATE -> "检查更新并升级"
+                DeviceAction.RESTART -> "重启服务"
+                DeviceAction.STOP -> "停止服务"
+                DeviceAction.CONNECT -> "连接服务"
+            }
+            AlertDialog(onDismissRequest = { pendingDeviceAction = null },
+                title = { Text(title) },
+                text = { Text(if (action == DeviceAction.UPDATE)
+                    "更新会校验暂存程序、保留旧程序并重启。失败时尝试恢复旧服务。配置和会话保留。"
+                    else "此操作会取消当前任务并结束待决审批。配置和会话保留。") },
+                confirmButton = { TextButton(onClick = {
+                    pendingDeviceAction = null
+                    connectedRecord?.let { connectHistory(it, action) }
+                }) { Text("确认") } },
+                dismissButton = { TextButton(onClick = { pendingDeviceAction = null }) { Text("取消") } })
+        }
+    }
+
+    @Composable private fun ServiceCard() = CardSection("服务管理", 16) {
+        Text(connectedRecord?.let { "当前目标：${it.host}:${it.port}" } ?: "先连接设备以管理服务。",
+            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+        Text("连接复用健康服务；升级、重启和停止由独立动作发起。",
+            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+        for ((label, action) in listOf("检查更新" to DeviceAction.UPDATE, "重启服务" to DeviceAction.RESTART, "停止服务" to DeviceAction.STOP)) {
+            ActionButton(label, !busy && connectedRecord != null, Modifier.padding(top = 8.dp),
+                action == DeviceAction.STOP) { pendingDeviceAction = action }
+        }
     }
 
     @OptIn(ExperimentalLayoutApi::class)
@@ -110,7 +142,9 @@ class MainActivity : ComponentActivity() {
                 val title = when (choice) { ConnectionMode.TCP -> "TCP"; ConnectionMode.WIRELESS_CODE -> "配对码"; ConnectionMode.WIRELESS_QR -> "二维码" }
                 val selected = choice == mode
                 OutlinedButton({ mode = choice; refreshHistory() }, enabled = !busy,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp).semantics {
+                        this.selected = selected
                         contentDescription = if (selected) "$title，当前连接方式" else "$title，切换连接方式"
                     }, border = ButtonDefaults.outlinedButtonBorder(!busy).copy(
                         width = if (selected) 2.dp else 1.dp,
@@ -120,7 +154,7 @@ class MainActivity : ComponentActivity() {
                         disabledContainerColor = MaterialTheme.colorScheme.surface,
                         contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                         disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                    Text(title, fontSize = 14.sp)
+                    Text(if (selected) "✓ $title" else title, fontSize = 14.sp)
                 }
             }
         }
@@ -134,7 +168,7 @@ class MainActivity : ComponentActivity() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.padding(top = 14.dp))
         }
         ActionButton(if (busy) "正在处理…" else when (mode) {
-            ConnectionMode.TCP -> "安装并启动"; ConnectionMode.WIRELESS_CODE -> "配对、安装并启动"; ConnectionMode.WIRELESS_QR -> "显示配对二维码"
+            ConnectionMode.TCP -> "连接 / 首次安装"; ConnectionMode.WIRELESS_CODE -> "配对并连接"; ConnectionMode.WIRELESS_QR -> "显示配对二维码"
         }, !busy, Modifier.padding(top = 16.dp), onClick = ::startSelectedAction)
     }
 
@@ -311,7 +345,7 @@ class MainActivity : ComponentActivity() {
         if (cancelJob && hadSession && busy) activeJob?.cancel()
     }
 
-    private fun connectHistory(record: ConnectionRecord) = runAction {
+    private fun connectHistory(record: ConnectionRecord, action: DeviceAction = DeviceAction.CONNECT) = runAction {
         val current = if (record.mode == ConnectionMode.TCP) record else {
             showStatus("正在查找 ${record.guid} 的无线连接服务…", StatusTone.WORKING)
             discoverConnection(
@@ -319,7 +353,7 @@ class MainActivity : ComponentActivity() {
                 routeHost = record.host.takeIf(String::isTailscaleAddress),
             )?.let { record.copy(host = if (record.host.isTailscaleAddress()) record.host else it.host, port = it.port) } ?: record
         }
-        install(current)
+        install(current, action)
     }
 
     private suspend fun discoverConnection(
@@ -369,12 +403,21 @@ class MainActivity : ComponentActivity() {
         } finally { client.close() }
     }
 
-    private suspend fun install(record: ConnectionRecord) {
-        webUrl = DeviceInstaller(applicationContext).install(record.host, record.port, record.mode != ConnectionMode.TCP) { message ->
+    private suspend fun install(record: ConnectionRecord, action: DeviceAction = DeviceAction.CONNECT) {
+        val result = DeviceInstaller(applicationContext).perform(record.host, record.port,
+            record.mode != ConnectionMode.TCP, action) { message ->
             withContext(Dispatchers.Main) { showStatus(message, StatusTone.WORKING) }
         }
-        history.save(record); getSharedPreferences("connection", MODE_PRIVATE).edit().putString("web_url", webUrl).apply()
-        showStatus("已启动。点击按钮在系统浏览器访问 $webUrl", StatusTone.SUCCESS); refreshHistory()
+        connectedRecord = record
+        result.url?.let { webUrl = it }
+        history.save(record)
+        getSharedPreferences("connection", MODE_PRIVATE).edit().putString("web_url", webUrl).apply()
+        when {
+            action == DeviceAction.STOP -> showStatus("已停止服务；保存的浏览器地址不代表在线。", StatusTone.IDLE)
+            result.legacy -> showStatus("已连接 ${result.version}：$webUrl\n旧版服务使用兼容模式；显式更新可迁移原生服务协议。", StatusTone.WARNING)
+            else -> showStatus("${result.version} 已在线：$webUrl", StatusTone.SUCCESS)
+        }
+        refreshHistory()
     }
 
     private fun runAction(action: suspend () -> Unit): Job? {

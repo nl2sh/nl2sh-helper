@@ -14,7 +14,11 @@ class ReleaseSelectionTest {
     }
 
     @Test fun rejectsUnsupportedDevice() {
-        assertThrows(IllegalStateException::class.java) { selectAbi("x86,x86_64") }
+        assertThrows(IllegalStateException::class.java) { selectAbi("x86") }
+    }
+
+    @Test fun selectsNativeX86OverTranslation() {
+        assertEquals("x86_64", selectAbi("arm64-v8a,x86_64"))
     }
 
     @Test fun parsesReleaseChecksum() {

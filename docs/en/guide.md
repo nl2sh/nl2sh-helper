@@ -1,6 +1,6 @@
 # Connection and deployment guide
 
-The helper is an Android ADB client and Web launcher, separate from the Accessibility/keyboard [android-bridge](https://github.com/nl2sh/android-bridge) companion and the [JADX helper](https://github.com/nl2sh/jadx-helper). It does not contain a model Agent or an A2A/MCP gateway. The controller runs Android API 26+; the target needs an ARM64 or ARMv7 nl2sh release and permission to execute from `/data/local/tmp`.
+The helper is an Android ADB client and Web launcher, separate from the Accessibility/keyboard [android-bridge](https://github.com/nl2sh/android-bridge) companion and the [JADX helper](https://github.com/nl2sh/jadx-helper). It does not contain a model Agent or an A2A/MCP gateway. The controller runs Android API 26+; the target needs an ARM64, ARMv7, or x86_64 nl2sh release and permission to execute from `/data/local/tmp`.
 
 ## Interface
 
@@ -14,21 +14,28 @@ Connection methods, status and history follow the shared nl2sh dark semantic des
 
 History is separated by connection mode and saves successful connections only. Records contain address, port, wireless GUID and update time, never the pairing code or QR password. Reconnecting a wireless record searches for its GUID for ten seconds, then tries its last address. Deleting a history row removes that record; it does not revoke the target's ADB authorization. Revoke authorization in target developer settings when necessary.
 
-## What installation does
+## Connection, updates, and service management
 
-1. Connect (45-second limit), read the target ABI list and prefer `arm64-v8a` over `armeabi-v7a`. x86/x86_64 releases are not supported by this installer.
-2. Query `nl2sh/nl2sh` GitHub's latest release, require matching `nl2sh-android-ABI` and `.sha256` assets, and download over HTTPS. There is no release selector or Gitee fallback.
-3. Fetch the checksum even on cache hits. Reuse a private cached binary only after checking its digest. Downloads are limited to 32,000,000 bytes; metadata to 512 KiB and checksums to 1024 bytes. Text requests retry I/O failures up to three times; this is not a retry of the entire deployment.
-4. Compare the target binary's digest. If different, upload to `/data/local/tmp/nl2sh.download`, chmod and rename it to `/data/local/tmp/nl2sh`, then verify its device digest. Check `--version` against the release tag.
-5. Stop the process recorded in `helper.pid` only if `/proc/PID/exe` matches the managed binary path. Refuse a conflicting port 9999. Start `nohup /data/local/tmp/nl2sh --web-only`, saving `helper.pid` and `nl2sh-web.log` in the helper directory, then check the process and `/api/sessions`. If the first check fails, stop any managed remainder and retry once. If both attempts fail, report each attempt's PID, liveness, executable path and log tail.
+“Connect / first installation” and history Connect first inspect the installed program. A healthy native service is reused without querying releases, downloading, uploading, or restarting. An installed but stopped service starts its existing binary. Only a missing installation downloads the latest release. Once connected, Service management provides separate Check updates, Restart service, and Stop service actions, each with confirmation. Stop/restart cancel tasks and pending approvals while preserving configuration and sessions. Wireless GUID rediscovery retains the selected action.
 
-The binary uses nl2sh's default deployment path, `/data/local/tmp/nl2sh`. The helper keeps only `helper.pid` and `nl2sh-web.log` under `/data/local/tmp/nl2sh-helper/`, and removes its legacy binary there after a successful upgrade. The launcher supplies no `--config`: nl2sh uses its own default configuration lookup. It does not provision an API key. Open the returned `http://TARGET_IP:9999/` in the controller's browser to configure the provider and use the Agent. Reconnecting also installs/checks the latest release and restarts the managed service.
+Lifecycle protocol 1 uses `nl2sh service ... --json`. The helper builds the browser URL from the actual returned port. Device readiness and controller `/healthz` plus `/api/info` checks independently verify status, PID, running version, and port; port 9999 is not assumed. A saved URL does not establish readiness. Connecting an existing managed legacy `nohup` service displays a compatibility warning, preserves its PID/executable and Web checks, and does not migrate or update automatically. Legacy mode still requires fixed port 9999. An explicit update moves to native lifecycle management when the installed version supports it.
+
+## Installation and update procedure
+
+1. Connect within 45 seconds and read the target ABI list. Native `x86_64` takes priority over translated ARM ABIs, followed by `arm64-v8a` and `armeabi-v7a`; x86 releases are unsupported.
+2. First installation or explicit update queries the latest `nl2sh/nl2sh` GitHub release, requiring matching `nl2sh-android-ABI` and `.sha256` assets over HTTPS. There is no version selector or Gitee fallback.
+3. Fetch and verify checksums even for private cache hits. Limits are 32,000,000 bytes for programs, 512 KiB for metadata, and 1024 bytes for checksums. Text I/O requests retry up to three times, rather than retrying the entire deployment.
+4. A matching target version and checksum reuses the service. Otherwise, upload `/data/local/tmp/nl2sh.download` and verify its device checksum and `--version` while the existing service runs. Verify and preserve the old program as `nl2sh.previous`, stop the owned service, atomically rename the new binary, and start it.
+5. The new service must pass target version, actual PID/port, and controller Web checks. Failure or cancellation attempts restoration before closing the ADB client: stop the new owned service, quarantine `nl2sh.failed`, verify and restore previous, and check the old service version. Report incomplete rollback honestly and retain files. A lost ADB connection, permission failures, or a corrupt backup may require manual recovery.
+6. Successful deployment writes adjacent `nl2sh.owner.json` containing Helper ownership, version, checksum, and GitHub source, without pairing secrets or model credentials. Keep previous until the next update; clean the legacy helper-directory binary only after success.
+
+The default binary path is `/data/local/tmp/nl2sh`. No `--config` or API key is supplied; nl2sh applies its own configuration lookup. Native service locks, state, and logs live in `config.service/` beside the default configuration. Legacy `helper.pid` and `nl2sh-web.log` remain under `/data/local/tmp/nl2sh-helper/`. Open the returned actual URL on the controller to configure the provider and use the Agent.
 
 ## Permissions and troubleshooting
 
 The manifest requests Internet and Wi-Fi multicast permissions, allows cleartext traffic for the target Web UI, and disables application backup. Release downloads require HTTPS. Target Web currently listens on all IPv4 interfaces without login: use a trusted network. Web tool actions still pass through the native security and browser confirmation chain; ADB installation commands themselves are explicit installer operations.
 
-If pairing succeeds but connection fails, check Wireless debugging's current connection port and multicast routing; pairing and connection ports differ and may change. If release lookup fails, check access to GitHub API and assets, rate limits and whether both ABI assets exist. A checksum mismatch is a failure, not an instruction to skip verification. If port 9999 is occupied, stop the identified conflicting service yourself or use a separate nl2sh launch configuration. If startup fails, inspect `/data/local/tmp/nl2sh-helper/nl2sh-web.log` through an authorized ADB session and confirm the controller can reach port 9999.
+If pairing succeeds but connection fails, check Wireless debugging's current connection port and multicast routing; pairing and connection ports differ and may change. If release lookup fails, check access to GitHub API and assets, rate limits and whether both ABI assets exist. A checksum mismatch is a failure, not an instruction to skip verification. Native services report an available port; the controller must reach that actual port. Inspect `config.service/service.log` through authorized ADB for native startup failures, or `/data/local/tmp/nl2sh-helper/nl2sh-web.log` for legacy mode. Update failures state whether rollback completed.
 
 ## Build
 
@@ -39,4 +46,21 @@ Use JDK 17, Android SDK Platform 36, the checked-in Gradle 9.1.0 Wrapper and And
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The application ID is `ernest.nl2sh.helper`. For local and GitHub Actions release signing, see [Signed builds and releases](releasing.md). Keep `local.properties`, build outputs and signing credentials out of Git. Unit tests cover release ABI/checksum selection and cache reuse/corruption, not real device pairing or Web startup.
+The application ID is `ernest.nl2sh.helper`. For local and GitHub Actions release signing, see [Signed builds and releases](releasing.md). Keep `local.properties`, build outputs and signing credentials out of Git. Unit tests cover ABI/ELF/checksum selection, caching, and cancellation/failure restoration. The emulator test below covers end-to-end lifecycle behavior; it does not establish vendor-device or wireless-pairing coverage.
+
+## Reproducible lifecycle verification
+
+Use only a disposable x86_64 Android emulator. Prepare a real runtime and a valid Android ELF that deliberately fails startup, then provide authorized TCP ADB and Web routes. The test does not contact release servers. It verifies connection without downloading/restarting, failed upgrade recovery of the old binary and owner, successful Helper-owned upgrade, and reconnect preserving PID. It replaces the target default binary; do not run against a production device.
+
+```sh
+python3 scripts/prepare-runtime-fixtures.py --runtime ../nl2sh/target/x86_64-linux-android/release/nl2sh
+./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell am instrument -w -r -e class ernest.nl2sh.helper.RuntimeLifecycleTest \
+  -e target_host TARGET_ADB_HOST -e adb_port TARGET_ADB_PORT -e web_port TARGET_WEB_PORT \
+  -e runtime_version RUNTIME_VERSION \
+  ernest.nl2sh.helper.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Preparation requires ANDROID_NDK_HOME/ANDROID_NDK_ROOT, rustc, and the x86_64-linux-android target. Fixtures stay in ignored app/build output and are excluded from production APKs. The controller must reach the actual service port through its configured Web route.

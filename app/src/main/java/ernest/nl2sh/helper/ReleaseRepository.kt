@@ -16,7 +16,7 @@ internal data class ReleaseBinary(val tag: String, val abi: String, val url: Str
 
 internal class ReleaseRepository(private val context: Context) {
     suspend fun latest(abi: String): ReleaseBinary = withContext(Dispatchers.IO) {
-        require(abi == "arm64-v8a" || abi == "armeabi-v7a")
+        require(abi in setOf("arm64-v8a", "armeabi-v7a", "x86_64"))
         val release = JSONObject(fetchText("https://api.github.com/repos/nl2sh/nl2sh/releases/latest", 512 * 1024))
         val tag = release.getString("tag_name")
         require(tag.matches(Regex("[A-Za-z0-9._-]{1,64}"))) { "Invalid release tag" }

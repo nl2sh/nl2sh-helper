@@ -37,9 +37,11 @@ android {
         applicationId = "ernest.nl2sh.helper"
         minSdk = 26
         targetSdk = 35
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionCode = releaseVersionCode
         versionName = providers.gradleProperty("nl2shHelperVersionName").orNull ?: "0.1.0"
     }
+    sourceSets.getByName("androidTest").assets.srcDir(layout.buildDirectory.dir("runtime-fixtures").get().asFile)
     signingConfigs {
         if (hasSigning) {
             create("release") {
@@ -84,4 +86,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.google.zxing:core:3.5.4")
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }
