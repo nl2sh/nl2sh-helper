@@ -68,3 +68,15 @@ adb shell am instrument -w -r -e class ernest.nl2sh.helper.RuntimeLifecycleTest 
 发布下载先验证签名兼容性 Manifest，再验证原生资产的 SHA-256、精确大小与独立 GPG 签名。公钥指纹固定为 `5230D3A7CCBEED4616D39C51FC6AD1BC63F7D4D8`，网络不能替换信任根。Manifest 要求助手版本与 service 协议兼容；无签名发布不能用于新安装或显式升级。已安装健康服务仍可连接，不查询发布。
 
 签名消费验证：18 项单元测试及 debug/release 构建、lint 通过；API 26 真实设备测试覆盖固定公钥、签名夹具认证、内容篡改拒绝、Manifest URL 漂移拒绝，以及原有连接复用和失败升级回滚。生产签名由发布工作流执行，本地可暂缓。
+
+## Android Bridge 管理
+
+连接设备后，“增强 Android 控制能力”提供检查、安装/升级、打开 Bridge、打开无障碍设置及键盘设置。检查显示已安装版本/协议、签名 Manifest 推荐版本，以及无障碍和键盘各自启用/运行状态；版本漂移明确提示。检查失败时兼容性信息为未知，不把未认证信息当成建议。连接健康服务本身不查询发布；只有显式检查/安装 Bridge 才获取该原生版本的签名 Manifest。
+
+安装前验证 GPG 签名、精确大小、SHA-256、APK 包名/版本及证书摘要；设备暂存文件再次核对 SHA-256，使用 `pm install -r`，安装后核对实际版本和协议，再打开应用。签名冲突停止并保留已有应用，不自动卸载或更换密钥。助手只打开设置，不写入系统无障碍或输入法开关，不改变原生服务 PID。两项服务独立，需你在目标设备手动启用。
+
+在一次性模拟器准备测试时，`scripts/prepare-runtime-fixtures.py --runtime <x86_64 Android binary> --bridge <signed Bridge APK>` 可生成测试资产，再构建 `:app:assembleDebugAndroidTest`。`BridgeManagementTest` 通过明确 ADB/Web 参数验证证书拒绝、真实覆盖安装、原生 PID 和启用选项保持，以及三个打开入口。测试资产不提交，不读取生产私钥。
+
+扩展诊断同时显示通过 PID/版本/实际端口验证的 `/api/info` 中的 JADX、Tailcat 与更新归属；无法核验时显示未知。API 26 真实 Bridge 管理回归、18 项单元测试和 debug/release 构建/lint 通过；界面覆盖正常竖屏、320dp/两倍字体确认框、窄横屏底部动作。旋转保留所选目标但清除过期诊断，长确认正文可滚动。
+
+![Bridge 与扩展诊断，未认证的推荐版本显示未知](../assets/ui-bridge.png)

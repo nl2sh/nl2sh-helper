@@ -68,3 +68,15 @@ Preparation requires ANDROID_NDK_HOME/ANDROID_NDK_ROOT, rustc, and the x86_64-li
 Release downloads authenticate the compatibility manifest first, then verify the native asset SHA-256, exact size and detached GPG signature. The pinned public-key fingerprint is `5230D3A7CCBEED4616D39C51FC6AD1BC63F7D4D8`; network responses cannot replace it. The manifest requires a compatible Helper version and service protocol. Unsigned releases cannot be newly installed or upgraded. Healthy installed services remain connectable without querying releases.
 
 Signature validation: 18 unit tests and debug/release assembly/lint passed. API 26 device tests cover the pinned key, authenticated signature fixture, tamper and manifest URL drift rejection, plus connection reuse and failed upgrade rollback. Production signing runs in the release workflow and may be deferred locally.
+
+## Android Bridge management
+
+After connecting, the Android control card offers inspection, install/upgrade, opening Bridge, and opening Accessibility/keyboard settings. It displays installed version/protocol, the signed manifest recommendation, and independent enabled/running service states. Version drift is explicit. Failed compatibility verification stays unknown. Healthy service connection does not query releases; only explicit Bridge inspection/installation fetches the signed manifest for that native version.
+
+Installation verifies the GPG signature, exact size, SHA-256, APK package/version and certificate digest. The staged device file is hashed again, installed with `pm install -r`, and checked for actual version/protocol before opening the app. Signature conflicts preserve the existing app and require an explicit migration. Helper opens settings without rewriting Accessibility or keyboard switches or replacing the native service. Enable the independent services manually on the target.
+
+For a disposable emulator, prepare assets with `scripts/prepare-runtime-fixtures.py --runtime <x86_64 Android binary> --bridge <signed Bridge APK>` and build `:app:assembleDebugAndroidTest`. `BridgeManagementTest` takes explicit ADB/Web parameters and covers certificate rejection, real in-place installation, preserved native PID/settings, and all three open actions. Test assets are not committed and do not require production private keys.
+
+Extension diagnostics also show JADX, Tailcat and update ownership from `/api/info` after checking PID/version/actual port. Unverified status stays unknown. API 26 Bridge management regression, 18 unit tests and debug/release assembly/lint passed. UI checks cover normal portrait, 320dp/two-times-font confirmation and narrow landscape actions. Rotation keeps the selected target while clearing stale diagnostics; long confirmation text scrolls.
+
+![Bridge and extension diagnostics; unauthenticated recommendations stay unknown](../assets/ui-bridge.png)

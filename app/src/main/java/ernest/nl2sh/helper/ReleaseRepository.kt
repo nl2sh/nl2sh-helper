@@ -70,6 +70,27 @@ internal class ReleaseRepository(private val context: Context) {
         file to asset.sha
     }
 
+    suspend fun cachedBridge(asset: RuntimeAsset): File = withContext(Dispatchers.IO) {
+        require(asset.packageName == "com.nl2sh.bridge" && asset.protocol == 2)
+        val directory = File(context.filesDir, "bridge-releases")
+        check(directory.mkdirs() || directory.isDirectory)
+        val file = File(directory, "${asset.sha}.apk")
+        val signature = fetchBytes(asset.signatureUrl, 16_384)
+        val verifier = trust()
+        fun verified(candidate: File): Boolean = candidate.isFile && candidate.length() == asset.size && sha256(candidate) == asset.sha
+        if (!verified(file)) {
+            val staged = File.createTempFile("bridge-", ".download", directory)
+            try {
+                download(asset.url, staged, 64 * 1024 * 1024)
+                require(verified(staged)) { "Bridge size or SHA-256 mismatch" }
+                verifier.verify(staged.readBytes(), signature)
+                java.nio.file.Files.move(staged.toPath(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            } finally { staged.delete() }
+        }
+        verifier.verify(file.readBytes(), signature)
+        file
+    }
+
     private fun trust() = ReleaseTrust(context.assets.open("nl2sh-release.gpg").use { it.readBytes() })
 
     private suspend fun fetchText(url: String, limit: Int) = fetchBytes(url, limit).toString(Charsets.UTF_8)

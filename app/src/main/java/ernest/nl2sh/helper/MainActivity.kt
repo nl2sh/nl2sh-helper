@@ -48,6 +48,8 @@ class MainActivity : ComponentActivity() {
     private var records by mutableStateOf(emptyList<ConnectionRecord>())
     private var webUrl by mutableStateOf<String?>(null)
     private var connectedRecord by mutableStateOf<ConnectionRecord?>(null)
+    private var bridgeSnapshot by mutableStateOf<BridgeSnapshot?>(null)
+    private var pendingBridgeInstall by mutableStateOf(false)
     private var pendingDeviceAction by mutableStateOf<DeviceAction?>(null)
     private var busy by mutableStateOf(false)
     private var qrBitmap by mutableStateOf<Bitmap?>(null)
@@ -63,6 +65,13 @@ class MainActivity : ComponentActivity() {
         mode = savedInstanceState?.getString("mode")?.let { saved ->
             ConnectionMode.entries.firstOrNull { it.name == saved }
         } ?: ConnectionMode.TCP
+        savedInstanceState?.getBundle("selected_device")?.let { selected ->
+            val selectedMode = ConnectionMode.entries.firstOrNull { it.name == selected.getString("mode") }
+            val selectedHost = selected.getString("host")
+            val selectedPort = selected.getInt("port")
+            if (selectedMode != null && !selectedHost.isNullOrBlank() && selectedPort in 1..65535)
+                connectedRecord = ConnectionRecord(selectedMode, selectedHost, selectedPort, selected.getString("guid").orEmpty())
+        }
         showStatus(webUrl?.let { "已保存上次地址：$it\n可打开浏览器；目标服务当前是否在线尚未检查。" }
             ?: "选择连接方式，填写目标设备信息后开始。", StatusTone.IDLE)
         refreshHistory()
@@ -88,6 +97,7 @@ class MainActivity : ComponentActivity() {
                 ConnectionCard()
                 StatusCard()
                 ServiceCard()
+                BridgeCard()
                 HistoryCard()
                 ActionButton("在浏览器中打开 nl2sh", webUrl != null, Modifier.padding(top = 16.dp)) {
                     webUrl?.let { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
@@ -100,6 +110,14 @@ class MainActivity : ComponentActivity() {
             }
         }
         qrBitmap?.let { QrDialog(it) }
+        if (pendingBridgeInstall) {
+            AlertDialog(onDismissRequest = { pendingBridgeInstall = false },
+                containerColor = MaterialTheme.colorScheme.surface,
+                title = { Text("安装 / 升级 Android Bridge") },
+                text = { Text("将按原生版本的签名 Manifest 验证并安装 Bridge，然后打开应用。已有签名不兼容时停止，不自动卸载。无障碍与键盘仍需你在目标设备手动启用。", modifier = Modifier.verticalScroll(rememberScrollState())) },
+                confirmButton = { TextButton(onClick = { pendingBridgeInstall = false; manageBridge(BridgeAction.INSTALL) }) { Text("确认安装") } },
+                dismissButton = { TextButton(onClick = { pendingBridgeInstall = false }) { Text("取消") } })
+        }
         pendingDeviceAction?.let { action ->
             val title = when (action) {
                 DeviceAction.UPDATE -> "检查更新并升级"
@@ -108,10 +126,11 @@ class MainActivity : ComponentActivity() {
                 DeviceAction.CONNECT -> "连接服务"
             }
             AlertDialog(onDismissRequest = { pendingDeviceAction = null },
+                containerColor = MaterialTheme.colorScheme.surface,
                 title = { Text(title) },
                 text = { Text(if (action == DeviceAction.UPDATE)
                     "更新会校验暂存程序、保留旧程序并重启。失败时尝试恢复旧服务。配置和会话保留。"
-                    else "此操作会取消当前任务并结束待决审批。配置和会话保留。") },
+                    else "此操作会取消当前任务并结束待决审批。配置和会话保留。", modifier = Modifier.verticalScroll(rememberScrollState())) },
                 confirmButton = { TextButton(onClick = {
                     pendingDeviceAction = null
                     connectedRecord?.let { connectHistory(it, action) }
@@ -131,6 +150,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @Composable private fun BridgeCard() = CardSection("增强 Android 控制能力", 16) {
+        bridgeSnapshot?.let { snapshot ->
+            if (snapshot.drift) Text("Bridge 版本或协议与建议不一致", color = colorResource(R.color.ui_warning), fontSize = 14.sp)
+            Text(snapshot.describe(), color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp)
+        } ?: Text("Android Bridge 状态尚未检查。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+        Text("无障碍与键盘独立启用；助手仅打开设置，不代改系统开关。",
+            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+        for ((label, action) in listOf("检查 Bridge" to BridgeAction.INSPECT, "打开 Bridge" to BridgeAction.OPEN_APP,
+            "打开无障碍设置" to BridgeAction.ACCESSIBILITY_SETTINGS, "打开键盘设置" to BridgeAction.KEYBOARD_SETTINGS)) {
+            ActionButton(label, !busy && connectedRecord != null, Modifier.padding(top = 8.dp)) { manageBridge(action) }
+        }
+        ActionButton("安装 / 升级 Bridge", !busy && connectedRecord != null, Modifier.padding(top = 8.dp)) { pendingBridgeInstall = true }
+    }
+
     @OptIn(ExperimentalLayoutApi::class)
     @Composable private fun ConnectionCard() = CardSection("连接设备", 20) {
         val configuration = LocalConfiguration.current
@@ -141,7 +174,7 @@ class MainActivity : ComponentActivity() {
             ConnectionMode.entries.forEach { choice ->
                 val title = when (choice) { ConnectionMode.TCP -> "TCP"; ConnectionMode.WIRELESS_CODE -> "配对码"; ConnectionMode.WIRELESS_QR -> "二维码" }
                 val selected = choice == mode
-                OutlinedButton({ mode = choice; refreshHistory() }, enabled = !busy,
+                OutlinedButton({ mode = choice; refreshHistory() }, enabled = !busy, shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp).semantics {
                         this.selected = selected
@@ -238,7 +271,7 @@ class MainActivity : ComponentActivity() {
     @Composable private fun ActionButton(text: String, enabled: Boolean, modifier: Modifier = Modifier,
                                          destructive: Boolean = false, onClick: () -> Unit) {
         val active = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-        OutlinedButton(onClick, modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = enabled,
+        OutlinedButton(onClick, modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = enabled, shape = RoundedCornerShape(8.dp),
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = MaterialTheme.colorScheme.surface,
                 disabledContainerColor = MaterialTheme.colorScheme.surface,
@@ -356,6 +389,20 @@ class MainActivity : ComponentActivity() {
         install(current, action)
     }
 
+    private fun manageBridge(action: BridgeAction) = runAction {
+        val record = requireNotNull(connectedRecord) { "请先连接目标设备。" }
+        val current = if (record.mode == ConnectionMode.TCP) record else
+            discoverConnection(record.guid, 10_000, routeHost = record.host.takeIf(String::isTailscaleAddress))
+                ?.let { record.copy(host = if (record.host.isTailscaleAddress()) record.host else it.host, port = it.port) } ?: record
+        val snapshot = DeviceBridgeManager(applicationContext).perform(current, action) { message ->
+            withContext(Dispatchers.Main) { showStatus(message, StatusTone.WORKING) }
+        }
+        connectedRecord = current
+        bridgeSnapshot = snapshot
+        showStatus("Bridge 状态已刷新，详情见增强控制卡片。" + (snapshot.note?.let { "\n$it" } ?: ""),
+            if (snapshot.drift || snapshot.note != null || !snapshot.installed) StatusTone.WARNING else StatusTone.IDLE)
+    }
+
     private suspend fun discoverConnection(
         guid: String,
         timeout: Long,
@@ -408,6 +455,7 @@ class MainActivity : ComponentActivity() {
             record.mode != ConnectionMode.TCP, action) { message ->
             withContext(Dispatchers.Main) { showStatus(message, StatusTone.WORKING) }
         }
+        if (connectedRecord != record) bridgeSnapshot = null
         connectedRecord = record
         result.url?.let { webUrl = it }
         history.save(record)
@@ -433,7 +481,14 @@ class MainActivity : ComponentActivity() {
 
     private fun report(error: Throwable) { Log.e("Nl2shHelper", "ADB operation failed", error); showStatus(error.message ?: error.javaClass.simpleName, StatusTone.ERROR) }
     private fun validHost(value: String) = value.length in 1..253 && value.matches(Regex("[A-Za-z0-9.-]+")) && !value.startsWith('-') && !value.endsWith('-') && !value.contains("..")
-    override fun onSaveInstanceState(outState: Bundle) { outState.putString("mode", mode.name); super.onSaveInstanceState(outState) }
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("mode", mode.name)
+        connectedRecord?.let { record -> outState.putBundle("selected_device", Bundle().apply {
+            putString("mode", record.mode.name); putString("host", record.host)
+            putInt("port", record.port); putString("guid", record.guid)
+        }) }
+        super.onSaveInstanceState(outState)
+    }
     override fun onDestroy() { stopQrPairing(); scope.cancel(); super.onDestroy() }
 }
 

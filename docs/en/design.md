@@ -21,3 +21,5 @@ These show two scroll positions on a 320dp display, before verifying a target in
 | ![Connection form](../assets/ui-tcp.png) | ![Status and service management](../assets/ui-status.png) |
 
 Service management stacks Check updates, Restart, and Stop vertically, enabled after connecting. Dark confirmation dialogs explain effects. Stopping returns to ready; legacy service compatibility shows attention.
+
+The Android control card stacks diagnostics and five actions with at least 48dp targets. Drift uses a short warning label while version/service details stay neutral. Installation has a dark confirmation describing certificate checks, refusal on signature conflict, and manual activation. Unchecked or unauthenticated compatibility is explicitly unknown.

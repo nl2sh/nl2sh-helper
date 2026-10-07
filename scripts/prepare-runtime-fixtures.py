@@ -9,6 +9,7 @@ import tempfile
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--runtime', required=True, type=Path, help='Real x86_64 Android release binary')
+parser.add_argument('--bridge', type=Path, help='Signed Bridge debug/release APK for explicit companion tests')
 args = parser.parse_args()
 ndk = os.environ.get('ANDROID_NDK_HOME') or os.environ.get('ANDROID_NDK_ROOT')
 if not ndk:
@@ -24,6 +25,8 @@ if len(header) != 20 or header[:6] != b'\x7fELF\x02\x01' or int.from_bytes(heade
 output = Path(__file__).resolve().parent.parent / 'app/build/runtime-fixtures'
 output.mkdir(parents=True, exist_ok=True)
 shutil.copyfile(args.runtime, output / 'good-runtime')
+if args.bridge:
+    shutil.copyfile(args.bridge, output / 'bridge.apk')
 for fixture in (Path(__file__).resolve().parent.parent / 'app/src/test/resources/signatures').glob('*'):
     shutil.copyfile(fixture, output / fixture.name)
 source = r'''fn main() {
