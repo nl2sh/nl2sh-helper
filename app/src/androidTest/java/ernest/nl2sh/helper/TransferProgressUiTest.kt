@@ -55,6 +55,22 @@ class TransferProgressUiTest {
         }
         instrumentation.waitForIdleSync()
     }
+    @Test fun cachedReleaseWarningRemainsVisibleAfterCompletion() {
+        val state = HelperUiState()
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                activity.setContent { Nl2shTheme {
+                    Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(20.dp)) { state.StatusCard() }
+                } }
+                state.status = UiStatus(StatusTone.WARNING,
+                    "1.2.0 已在线：http://10.0.2.2:9999\n更新检查失败；使用已验证的缓存版本 v1.2.0，尚未确认是否为最新版本。\n缓存不高于目标版本，已保留现有程序。")
+            }
+            awaitText("尚未确认是否为最新版本")
+            awaitText("已保留现有程序")
+            assertFalse(allText().contains("100%"))
+            screenshot("helper-offline-cache-warning.png")
+        }
+    }
     private fun allText(): String {
         fun collect(node: AccessibilityNodeInfo?): String {
             if (node == null) return ""

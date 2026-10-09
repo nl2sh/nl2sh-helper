@@ -39,3 +39,5 @@ Local pairing has a dark draggable overlay for devices without Settings split-sc
 A notification reply fallback supports systems that hide overlays. The system reply editor has no application password mask; sent input is not echoed. Notification pairing status never implies a running nl2sh service.
 
 Downloads and ADB uploads show a progress bar, byte counters and percentage in the shared status card. Reaching 100% does not mean installation succeeded: device acknowledgement, signature/checksum checks, installation and startup phases follow. Cache hits show cache verification. Phases without measurable byte totals use an indeterminate bar; failure, cancellation or completion clears progress. nl2sh and Bridge installations share this display.
+
+Offline cache installation finishes with a warning identifying the cached version and unconfirmed freshness. Targets at the same or a newer version keep their existing executable.

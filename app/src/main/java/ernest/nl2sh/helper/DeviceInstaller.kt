@@ -17,7 +17,7 @@ import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 
 internal enum class DeviceAction { CONNECT, UPDATE, RESTART, STOP }
-internal data class DeviceResult(val url: String?, val version: String?, val legacy: Boolean = false)
+internal data class DeviceResult(val url: String?, val version: String?, val legacy: Boolean = false, val notice: String? = null)
 internal data class NativeServiceState(val state: String, val pid: Long?, val version: String?, val port: Int?) {
     init {
         require(state in setOf("ready", "starting", "stopped")) { "Unknown service state" }
@@ -28,15 +28,13 @@ internal data class NativeServiceState(val state: String, val pid: Long?, val ve
 }
 
 /** Connect only installs when absent. Binary changes and process replacement require explicit actions. */
-internal data class PreparedRelease(val release: ReleaseBinary, val binary: File, val sha: String)
+internal data class PreparedRelease(val release: ReleaseBinary, val binary: File, val sha: String, val cacheNotice: String? = null)
 
 internal class DeviceInstaller(private val context: Context,
     private val progress: (TransferProgress) -> Unit = {},
     private val releaseLoader: suspend (String) -> PreparedRelease = { abi ->
         val repository = ReleaseRepository(context, progress)
-        val release = repository.latest(abi)
-        val (binary, sha) = repository.cachedBinary(release)
-        PreparedRelease(release, binary, sha)
+        repository.prepare(abi)
     }) {
     suspend fun perform(host: String, port: Int, wireless: Boolean, action: DeviceAction,
                         report: suspend (String) -> Unit): DeviceResult = withContext(Dispatchers.IO) {
@@ -98,16 +96,22 @@ internal class DeviceInstaller(private val context: Context,
         check(release.abi == abi) { "发布架构与目标不一致。" }
         validateRuntimeElf(binary, abi)
         check(sha256(binary) == expectedSha) { "发布缓存摘要无效。" }
-        report("已校验发布：${release.tag}")
+        report(prepared.cacheNotice ?: "已校验发布：${release.tag}")
         val originalSha = if (installed) remoteSha(client, REMOTE_BINARY) else null
         check(!installed || originalSha != null) { "无法校验现有程序，未开始替换。" }
         val originalNative = installed && supportsService(client)
         val originalVersion = if (installed) installedVersion(client) else null
+        check(prepared.cacheNotice == null || !installed || originalVersion != null) { "无法确认目标版本，未使用缓存替换现有程序。" }
+        if (prepared.cacheNotice != null && originalVersion != null &&
+            compareReleaseVersions(expectedVersion, originalVersion) <= 0) {
+            report("缓存 ${release.tag} 不高于目标 $originalVersion；保留现有程序，不推送或重启。")
+            return connectExisting(client, host, report).copy(notice = prepared.cacheNotice + "\n缓存不高于目标版本，已保留现有程序。")
+        }
         if (originalSha == expectedSha) {
             check(originalVersion == expectedVersion) { "设备版本与已校验发布不一致。" }
             writeOwner(client, expectedVersion, expectedSha)
             report("已是目标版本，摘要一致；已确认 Helper 管理归属，不推送或重启。")
-            return connectExisting(client, host, report)
+            return connectExisting(client, host, report).copy(notice = prepared.cacheNotice)
         }
         runChecked(client, "mkdir -p $REMOTE_DIR")
         report("推送已校验程序；现有服务继续运行…")
@@ -136,7 +140,7 @@ internal class DeviceInstaller(private val context: Context,
             runChecked(client, "mv -f $REMOTE_BINARY.download $REMOTE_BINARY")
             check(remoteSha(client, REMOTE_BINARY) == expectedSha) { "安装后摘要不一致。" }
             writeOwner(client, expectedVersion, expectedSha)
-            val result = startAndCheck(client, host, expectedVersion, report)
+            val result = startAndCheck(client, host, expectedVersion, report).copy(notice = prepared.cacheNotice)
             runChecked(client, "rm -f $LEGACY_REMOTE_BINARY")
             report("${release.tag} 已更新并通过版本及 Web 检查；旧程序保留用于回滚。")
             result

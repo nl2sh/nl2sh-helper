@@ -23,6 +23,25 @@ internal data class RuntimePolicy(val version: String, val native: RuntimeAsset,
 
 internal class ReleaseRepository(private val context: Context,
     private val report: (TransferProgress) -> Unit = {}) {
+    private val manifests = mutableMapOf<String, SignedManifest>()
+    private fun offlineCache() = OfflineReleaseCache(File(context.filesDir, "releases"), ::authenticateManifest) { bytes, signature -> trust().verify(bytes, signature) }
+
+    suspend fun prepare(abi: String): PreparedRelease = withContext(Dispatchers.IO) {
+        require(abi in setOf("arm64-v8a", "armeabi-v7a", "x86_64"))
+        try {
+            val release = latest(abi)
+            val (file, sha) = cachedBinary(release)
+            PreparedRelease(release, file, sha)
+        } catch (error: Exception) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            currentCoroutineContext().ensureActive()
+            report(TransferProgress("更新检查或下载失败；重新验证离线缓存…"))
+            val job = currentCoroutineContext()
+            offlineCache().newest(abi) { job.ensureActive() }
+                ?: throw IOException("更新检查失败，且没有此架构的完整已验证缓存；请联网完成一次下载后重试。", error)
+        }
+    }
+
     suspend fun latest(abi: String): ReleaseBinary = withContext(Dispatchers.IO) {
         require(abi in setOf("arm64-v8a", "armeabi-v7a", "x86_64"))
         val release = JSONObject(fetchText("https://api.github.com/repos/nl2sh/nl2sh/releases/latest", 512 * 1024))
@@ -37,6 +56,16 @@ internal class ReleaseRepository(private val context: Context,
         val prefix = "https://github.com/nl2sh/nl2sh/releases/download/$tag/"
         val bytes = fetchBytes("${prefix}nl2sh-runtime.json", 1024 * 1024)
         val signature = fetchBytes("${prefix}nl2sh-runtime.json.sig", 16_384)
+        val result = authenticateManifest(tag, abi, bytes, signature)
+        manifests["$tag/$abi"] = SignedManifest(bytes, signature, result)
+        result
+    }
+
+    private fun authenticateManifest(tag: String, abi: String, bytes: ByteArray, signature: ByteArray): RuntimePolicy {
+        require(validReleaseVersion(tag.removePrefix("v")) && tag.startsWith("v")) { "Invalid release tag" }
+        require(abi in setOf("arm64-v8a", "armeabi-v7a", "x86_64"))
+        require(bytes.size in 1..1_048_576) { "Runtime manifest exceeds limit" }
+        val prefix = "https://github.com/nl2sh/nl2sh/releases/download/$tag/"
         trust().verify(bytes, signature)
         val manifest = JSONObject(bytes.toString(Charsets.UTF_8))
         require(manifest.getInt("schema") == 1 && manifest.getString("nl2sh") == tag.removePrefix("v")) {
@@ -55,11 +84,14 @@ internal class ReleaseRepository(private val context: Context,
                 }
             }
         }
-        RuntimePolicy(manifest.getString("nl2sh"), native, bridge)
+        return RuntimePolicy(manifest.getString("nl2sh"), native, bridge)
     }
 
     suspend fun cachedBinary(release: ReleaseBinary): Pair<File, String> = withContext(Dispatchers.IO) {
         val asset = requireNotNull(release.authenticated) { "Unsigned release is not installable" }
+        if (manifests["${release.tag}/${release.abi}"] == null) policy(release.tag, release.abi)
+        val signedManifest = requireNotNull(manifests["${release.tag}/${release.abi}"])
+        require(signedManifest.policy.native == asset) { "Release does not match authenticated manifest" }
         report(TransferProgress("获取并验证发布签名…"))
         val job = currentCoroutineContext()
         val signature = fetchBytes(asset.signatureUrl, 16_384)
@@ -74,6 +106,7 @@ internal class ReleaseRepository(private val context: Context,
         report(TransferProgress("校验本地缓存的大小、SHA-256 与 GPG 签名…"))
         require(file.length() == asset.size) { "Cached release size mismatch" }
         verifier.verify(file.readBytes(), signature)
+        offlineCache().save(release, signedManifest, signature)
         file to asset.sha
     }
 
@@ -142,7 +175,7 @@ internal class ReleaseRepository(private val context: Context,
         connection.setRequestProperty("User-Agent", "nl2sh-helper")
         connection.setRequestProperty("Accept", "application/vnd.github+json")
         try {
-            check(connection.responseCode == 200) { "Release request failed: HTTP ${connection.responseCode}" }
+            if (connection.responseCode != 200) throw IOException("Release request failed: HTTP ${connection.responseCode}")
             require(connection.url.protocol == "https") { "Insecure release redirect" }
             return connection
         } catch (error: Exception) {

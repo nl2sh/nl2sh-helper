@@ -313,6 +313,8 @@ class MainActivity : ComponentActivity() {
         getSharedPreferences("connection", MODE_PRIVATE).edit().putString("web_url", webUrl).apply()
         when {
             action == DeviceAction.STOP -> showStatus("已停止服务；保存的浏览器地址不代表在线。", StatusTone.IDLE)
+            result.notice != null -> showStatus("${result.version} 已在线：$webUrl\n${result.notice}" +
+                if (result.legacy) "\n旧版服务使用兼容模式。" else "", StatusTone.WARNING)
             result.legacy -> showStatus("已连接 ${result.version}：$webUrl\n旧版服务使用兼容模式；显式更新可迁移原生服务协议。", StatusTone.WARNING)
             else -> showStatus("${result.version} 已在线：$webUrl", StatusTone.SUCCESS)
         }
