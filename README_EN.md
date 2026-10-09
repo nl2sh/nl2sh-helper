@@ -25,4 +25,4 @@ Connecting reuses a healthy installation. Separate controls check updates, resta
 Release downloads authenticate the compatibility manifest first, then verify the native asset SHA-256, exact size and detached GPG signature. The pinned public-key fingerprint is `5230D3A7CCBEED4616D39C51FC6AD1BC63F7D4D8`; network responses cannot replace it. The manifest requires a compatible Helper version and service protocol. Unsigned releases cannot be newly installed or upgraded. Healthy installed services remain connectable without querying releases.
 
 
-On Android 11+, Local mode pairs with this device over wireless debugging and installs/runs nl2sh as shell. It supports discovery and manual connection ports; Web uses the actual port on `127.0.0.1`. See the [local guide](docs/en/guide.md#install-and-run-on-this-device).
+On Android 11+, Local mode pairs with this device over wireless debugging and installs/runs nl2sh as shell. It supports a draggable pairing overlay without split screen, discovery and manual connection ports; Web uses the actual port on `127.0.0.1`. See the [local guide](docs/en/guide.md#install-and-run-on-this-device).

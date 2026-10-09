@@ -25,3 +25,7 @@ Service management stacks Check updates, Restart, and Stop vertically, enabled a
 The Android control card stacks diagnostics and five actions with at least 48dp targets. Drift uses a short warning label while version/service details stay neutral. Installation has a dark confirmation describing certificate checks, refusal on signature conflict, and manual activation. Unchecked or unauthenticated compatibility is explicitly unknown.
 
 Local is the default among four connection modes, normally arranged in two columns and stacked on narrow displays with large fonts. Its form includes Developer options, a pairing port, masked six-digit code and optional connection port. Instructions use neutral text; local history is separate.
+
+Local pairing has a dark draggable overlay for devices without Settings split-screen support. Dragging, collapse/expand, close and a scrollable form support narrow screens and large fonts. Six-digit codes stay masked and are never saved. Pairing completion is distinct from starting nl2sh; return to the helper to install/start. Inputs gain visible focus and open the keyboard only on touch.
+
+A notification reply fallback supports systems that hide overlays. The system reply editor has no application password mask; sent input is not echoed. Notification pairing status never implies a running nl2sh service.

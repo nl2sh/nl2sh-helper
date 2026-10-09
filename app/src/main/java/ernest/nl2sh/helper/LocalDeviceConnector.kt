@@ -17,16 +17,7 @@ internal class LocalDeviceConnector(private val context: Context) {
                         fallbackPort: Int? = null, report: suspend (String) -> Unit): ConnectionRecord {
         check(Build.VERSION.SDK_INT >= 30) { "本机模式需要 Android 11+ 的无线调试。" }
         var guid = preferences.getString("guid", "").orEmpty()
-        if (pairingPort != null) {
-            report("正在与本机无线调试配对…")
-            guid = withContext(Dispatchers.IO) {
-                val client = DefaultAdbClient.factory(context).create()
-                try { withTimeout(45_000) { client.pairWireless(AdbEndpoint(LOCAL_ADB_HOST, pairingPort), code) } }
-                finally { client.close() }
-            }
-            // Keep authorization identity even if subsequent discovery or installation fails.
-            preferences.edit().putString("guid", guid).apply()
-        }
+        if (pairingPort != null) guid = pairLocal(pairingPort, code, report)
         report("正在查找本机无线调试连接端口…")
         val savedPort = preferences.getInt("port", 0).takeIf { it in 1..65535 }
         val selectedPort = connectionPort ?: discover(guid) ?: savedPort ?: fallbackPort
@@ -34,6 +25,19 @@ internal class LocalDeviceConnector(private val context: Context) {
         check(probe(selectedPort)) { "无法连接本机无线调试端口 $selectedPort。请开启无线调试，核对连接端口；授权被撤销时重新配对。" }
         preferences.edit().putInt("port", selectedPort).apply()
         return ConnectionRecord(ConnectionMode.LOCAL, LOCAL_ADB_HOST, selectedPort, guid)
+    }
+
+    suspend fun pairLocal(port: Int, code: String, report: suspend (String) -> Unit): String {
+        check(Build.VERSION.SDK_INT >= 30) { "本机模式需要 Android 11+ 的无线调试。" }
+        require(port in 1..65535 && code.matches(Regex("[0-9]{6}"))) { "请输入有效的临时配对端口和六位码。" }
+        report("正在与本机无线调试配对…")
+        val guid = withContext(Dispatchers.IO) {
+            val client = DefaultAdbClient.factory(context).create()
+            try { withTimeout(45_000) { client.pairWireless(AdbEndpoint(LOCAL_ADB_HOST, port), code) } }
+            finally { client.close() }
+        }
+        preferences.edit().putString("guid", guid).apply()
+        return guid
     }
 
     suspend fun reconnect(record: ConnectionRecord, report: suspend (String) -> Unit): ConnectionRecord =

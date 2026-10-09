@@ -83,6 +83,7 @@ class MainActivity : ComponentActivity() {
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN or
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         setContent { Nl2shTheme { HelperScreen() } }
+        acceptOverlayResult(intent)
     }
 
     @Composable private fun HelperScreen() {
@@ -198,11 +199,13 @@ class MainActivity : ComponentActivity() {
         }
         when (mode) {
             ConnectionMode.LOCAL -> {
-                Text("通过本机无线调试以 shell 权限安装并启动 nl2sh。需要 Android 11+。首次在无线调试中选择使用配对码配对设备；建议分屏输入。以后可直接启动。", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 14.dp))
+                Text("通过本机无线调试以 shell 权限安装并启动 nl2sh。需要 Android 11+。首次在无线调试中选择使用配对码配对设备；可使用配对浮窗，无需分屏。以后可直接启动。", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 14.dp))
                 ActionButton("打开开发者选项", !busy, Modifier.padding(top = 8.dp)) {
                     runCatching { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) }
                         .onFailure { showStatus("请在系统设置中手动打开开发者选项 → 无线调试。", StatusTone.WARNING) }
                 }
+                ActionButton("打开配对浮窗", !busy, Modifier.padding(top = 8.dp)) { openPairingOverlay() }
+                Text("首次需允许显示在其他应用上层。若系统设置隐藏浮窗，可在配对通知中输入“端口 六位码”；需允许通知。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 Field("临时配对端口", localPairingPort, { localPairingPort = it }, KeyboardType.Number)
                 Field("六位配对码", localPairingCode, { localPairingCode = it }, KeyboardType.NumberPassword, true)
                 Field("连接端口（可选）", localConnectionPort, { localConnectionPort = it }, KeyboardType.Number)
@@ -305,6 +308,53 @@ class MainActivity : ComponentActivity() {
                     Modifier.fillMaxWidth().heightIn(max = 320.dp).background(androidx.compose.ui.graphics.Color.White).padding(16.dp))
             } }, confirmButton = {}, dismissButton = { TextButton(onClick = ::cancelQrPairing) { Text("取消") } },
             containerColor = MaterialTheme.colorScheme.surface)
+    }
+
+    private fun openPairingOverlay() {
+        if (android.os.Build.VERSION.SDK_INT < 30) {
+            showStatus("配对浮窗需要 Android 11+。", StatusTone.ERROR); return
+        }
+        if (!android.provider.Settings.canDrawOverlays(this)) {
+            showStatus("请允许显示在其他应用上层，返回后再次点击打开配对浮窗。", StatusTone.IDLE)
+            runCatching { startActivity(Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))) }
+                .onFailure { showStatus("请在系统设置中为助手允许显示在其他应用上层。", StatusTone.WARNING) }
+            return
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 41)
+            return
+        }
+        startPairingOverlayService()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 41 && android.provider.Settings.canDrawOverlays(this)) startPairingOverlayService()
+    }
+
+    private fun startPairingOverlayService() {
+        runCatching { startForegroundService(Intent(this, LocalPairingOverlayService::class.java)) }
+            .onFailure { report(it) }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        acceptOverlayResult(intent)
+    }
+
+    private fun acceptOverlayResult(intent: Intent) {
+        if (intent.getBooleanExtra("close_pairing_overlay", false)) {
+            stopService(Intent(this, LocalPairingOverlayService::class.java))
+            intent.removeExtra("close_pairing_overlay")
+        }
+        if (intent.getBooleanExtra("local_pairing_complete", false)) {
+            mode = ConnectionMode.LOCAL
+            localPairingCode = ""; localPairingPort = ""
+            refreshHistory()
+            showStatus("本机已配对。点击启动 / 首次安装 nl2sh；发现失败时填写无线调试主页的连接端口。", StatusTone.IDLE)
+            intent.removeExtra("local_pairing_complete")
+        }
     }
 
     private fun refreshHistory() { records = history.list(mode) }
