@@ -40,7 +40,11 @@ import kotlinx.coroutines.channels.Channel
 class MainActivity : ComponentActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val history by lazy { ConnectionHistory(this) }
-    private var mode by mutableStateOf(ConnectionMode.TCP)
+    private var mode by mutableStateOf(ConnectionMode.LOCAL)
+    private var localPairingPort by mutableStateOf("")
+    private var localConnectionPort by mutableStateOf("")
+    private var localPairingCode by mutableStateOf("")
+    private val localConnector by lazy { LocalDeviceConnector(applicationContext) }
     private var host by mutableStateOf("")
     private var port by mutableStateOf("5555")
     private var pairingCode by mutableStateOf("")
@@ -64,7 +68,7 @@ class MainActivity : ComponentActivity() {
         port = prefs.getInt("port", 5555).toString()
         mode = savedInstanceState?.getString("mode")?.let { saved ->
             ConnectionMode.entries.firstOrNull { it.name == saved }
-        } ?: ConnectionMode.TCP
+        } ?: ConnectionMode.LOCAL
         savedInstanceState?.getBundle("selected_device")?.let { selected ->
             val selectedMode = ConnectionMode.entries.firstOrNull { it.name == selected.getString("mode") }
             val selectedHost = selected.getString("host")
@@ -74,6 +78,7 @@ class MainActivity : ComponentActivity() {
         }
         showStatus(webUrl?.let { "已保存上次地址：$it\n可打开浏览器；目标服务当前是否在线尚未检查。" }
             ?: "选择连接方式，填写目标设备信息后开始。", StatusTone.IDLE)
+        localConnectionPort = savedInstanceState?.getString("local_connection_port").orEmpty()
         refreshHistory()
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN or
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
@@ -170,9 +175,9 @@ class MainActivity : ComponentActivity() {
         val stackedModes = configuration.screenWidthDp < 480 && configuration.fontScale >= 1.3f
         FlowRow(Modifier.fillMaxWidth().padding(top = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp),
-            maxItemsInEachRow = if (stackedModes) 1 else 3) {
+            maxItemsInEachRow = if (stackedModes) 1 else 2) {
             ConnectionMode.entries.forEach { choice ->
-                val title = when (choice) { ConnectionMode.TCP -> "TCP"; ConnectionMode.WIRELESS_CODE -> "配对码"; ConnectionMode.WIRELESS_QR -> "二维码" }
+                val title = when (choice) { ConnectionMode.LOCAL -> "本机"; ConnectionMode.TCP -> "TCP"; ConnectionMode.WIRELESS_CODE -> "配对码"; ConnectionMode.WIRELESS_QR -> "二维码" }
                 val selected = choice == mode
                 OutlinedButton({ mode = choice; refreshHistory() }, enabled = !busy, shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
@@ -192,6 +197,17 @@ class MainActivity : ComponentActivity() {
             }
         }
         when (mode) {
+            ConnectionMode.LOCAL -> {
+                Text("通过本机无线调试以 shell 权限安装并启动 nl2sh。需要 Android 11+。首次在无线调试中选择使用配对码配对设备；建议分屏输入。以后可直接启动。", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 14.dp))
+                ActionButton("打开开发者选项", !busy, Modifier.padding(top = 8.dp)) {
+                    runCatching { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) }
+                        .onFailure { showStatus("请在系统设置中手动打开开发者选项 → 无线调试。", StatusTone.WARNING) }
+                }
+                Field("临时配对端口", localPairingPort, { localPairingPort = it }, KeyboardType.Number)
+                Field("六位配对码", localPairingCode, { localPairingCode = it }, KeyboardType.NumberPassword, true)
+                Field("连接端口（可选）", localConnectionPort, { localConnectionPort = it }, KeyboardType.Number)
+                Text("连接端口位于无线调试主页，与临时配对端口不同。已配对时留空配对端口和配对码。Web 使用 127.0.0.1。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+            }
             ConnectionMode.TCP -> EndpointForm("在目标设备开启 TCP ADB，首次连接时批准 RSA 授权。", "目标设备地址", "ADB 端口")
             ConnectionMode.WIRELESS_CODE -> {
                 EndpointForm("在目标设备的“开发者选项 → 无线调试”中选择“使用配对码配对设备”。输入临时配对地址、端口和六位配对码。", "配对地址", "临时配对端口")
@@ -201,7 +217,7 @@ class MainActivity : ComponentActivity() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.padding(top = 14.dp))
         }
         ActionButton(if (busy) "正在处理…" else when (mode) {
-            ConnectionMode.TCP -> "连接 / 首次安装"; ConnectionMode.WIRELESS_CODE -> "配对并连接"; ConnectionMode.WIRELESS_QR -> "显示配对二维码"
+            ConnectionMode.LOCAL -> "启动 / 首次安装 nl2sh"; ConnectionMode.TCP -> "连接 / 首次安装"; ConnectionMode.WIRELESS_CODE -> "配对并连接"; ConnectionMode.WIRELESS_QR -> "显示配对二维码"
         }, !busy, Modifier.padding(top = 16.dp), onClick = ::startSelectedAction)
     }
 
@@ -296,6 +312,22 @@ class MainActivity : ComponentActivity() {
 
     private fun startSelectedAction() {
         when (mode) {
+            ConnectionMode.LOCAL -> {
+                fun parsePort(value: String): Int? = value.trim().takeIf { it.isNotEmpty() }?.let {
+                    require(it.toIntOrNull() in 1..65535) { "请输入 1–65535 的本机端口。" }; it.toInt()
+                }
+                runAction {
+                    val pairing = parsePort(localPairingPort)
+                    val connection = parsePort(localConnectionPort)
+                    val code = localPairingCode.trim()
+                    require((pairing == null && code.isEmpty()) || (pairing != null && code.matches(Regex("[0-9]{6}")))) { "首次配对请同时填写临时配对端口和六位码。" }
+                    try {
+                        val record = localConnector.connect(pairing, code, connection) { showStatus(it, StatusTone.WORKING) }
+                        localPairingPort = ""
+                        install(record)
+                    } finally { localPairingCode = ""; localPairingPort = "" }
+                }
+            }
             ConnectionMode.TCP -> {
                 val endpoint = inputEndpoint() ?: return
                 getSharedPreferences("connection", MODE_PRIVATE).edit().putString("host", endpoint.host).putInt("port", endpoint.port).apply()
@@ -379,7 +411,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun connectHistory(record: ConnectionRecord, action: DeviceAction = DeviceAction.CONNECT) = runAction {
-        val current = if (record.mode == ConnectionMode.TCP) record else {
+        val current = if (record.mode == ConnectionMode.LOCAL) localConnector.reconnect(record) { showStatus(it, StatusTone.WORKING) } else if (record.mode == ConnectionMode.TCP) record else {
             showStatus("正在查找 ${record.guid} 的无线连接服务…", StatusTone.WORKING)
             discoverConnection(
                 record.guid, 10_000,
@@ -391,7 +423,7 @@ class MainActivity : ComponentActivity() {
 
     private fun manageBridge(action: BridgeAction) = runAction {
         val record = requireNotNull(connectedRecord) { "请先连接目标设备。" }
-        val current = if (record.mode == ConnectionMode.TCP) record else
+        val current = if (record.mode == ConnectionMode.LOCAL) localConnector.reconnect(record) { showStatus(it, StatusTone.WORKING) } else if (record.mode == ConnectionMode.TCP) record else
             discoverConnection(record.guid, 10_000, routeHost = record.host.takeIf(String::isTailscaleAddress))
                 ?.let { record.copy(host = if (record.host.isTailscaleAddress()) record.host else it.host, port = it.port) } ?: record
         val snapshot = DeviceBridgeManager(applicationContext).perform(current, action) { message ->
@@ -483,6 +515,7 @@ class MainActivity : ComponentActivity() {
     private fun validHost(value: String) = value.length in 1..253 && value.matches(Regex("[A-Za-z0-9.-]+")) && !value.startsWith('-') && !value.endsWith('-') && !value.contains("..")
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("mode", mode.name)
+        outState.putString("local_connection_port", localConnectionPort)
         connectedRecord?.let { record -> outState.putBundle("selected_device", Bundle().apply {
             putString("mode", record.mode.name); putString("host", record.host)
             putInt("port", record.port); putString("guid", record.guid)

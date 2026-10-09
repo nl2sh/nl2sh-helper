@@ -82,3 +82,24 @@ adb shell am instrument -w -r -e class ernest.nl2sh.helper.RuntimeLifecycleTest 
 ![Bridge 与扩展诊断，未认证的推荐版本显示未知](../assets/ui-bridge.png)
 
 显式更新时，即使已认证目标二进制摘要相同，也登记 Helper 管理归属；复用健康服务，不推送文件或重启。普通连接不改变安装归属。
+
+## 本机安装与启动
+
+选择“本机”，在 Android 11+ 的开发者选项中开启无线调试。首次选择“使用配对码配对设备”，建议分屏将临时配对端口和六位码填入助手。配对通过 `127.0.0.1` 完成，不需要填写 Wi-Fi 地址。配对后自动发现本机连接服务；若 ROM 不支持自发现，填写无线调试主页显示的连接端口，再点击“启动 / 首次安装 nl2sh”。连接端口与配对端口不同。已配对时将配对字段留空；配对身份在发现或安装失败后仍保留，不保存六位码。
+
+以后直接点击启动或本机历史连接。端口变化时自动重新发现，失败时尝试上次端口，也可手动输入当前端口。撤销授权后需重新配对；重启后可能需再次开启无线调试。Android 10 及以下仍使用远程连接方式。
+
+本机与远程模式共享签名验证、ABI 选择、安装、更新回滚、服务及 Bridge 管理。程序仍位于 `/data/local/tmp/nl2sh` 并以 shell 权限运行，浏览器和健康检查使用 `http://127.0.0.1:<实际端口>/`。原生服务脱离 ADB 会话，关闭助手后可继续运行；停止服务、设备重启或系统清理进程会结束运行。Web 仍监听所有 IPv4 接口，本机入口不改变监听范围。
+
+### 本机端到端回归
+
+`LocalRuntimeTest` 仅对一次性 Android 11+ 模拟器执行：默认路径必须尚未安装 nl2sh，使用前文准备的真实 x86_64 夹具、开启无线调试并保持配对码窗口有效。安装 debug 与 androidTest APK 后执行：
+
+```sh
+adb shell am instrument --user 0 -w -r -e class ernest.nl2sh.helper.LocalRuntimeTest \
+  -e disposable_local_device yes -e pairing_port PAIRING_PORT -e pairing_code PAIRING_CODE \
+  -e connection_port CONNECTION_PORT -e runtime_version RUNTIME_VERSION \
+  ernest.nl2sh.helper.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+测试使用真实 TLS 配对和回环连接，检查 shell UID、首次安装、实际 Web 地址、历史保存、重连 PID 保持、重启及停止。测试安装使用已准备的真实二进制夹具，发布下载与签名认证由独立测试覆盖；不要把它解释为生产 Release 下载验收。新增本机匹配/历史测试后共有 21 项单元测试。已在 API 35 模拟器通过上述端到端测试及 debug/release 构建和 lint；厂商 ROM 真机兼容性仍需分别验证。

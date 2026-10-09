@@ -38,3 +38,6 @@ Android 包名：`ernest.nl2sh.helper`。ADB 依赖由 Gradle 从 JitPack 的固
 [界面与视觉规范](docs/zh/design.md) · [贡献者视觉约束](UI_DESIGN.md)
 
 发布下载先验证签名兼容性 Manifest，再验证原生资产的 SHA-256、精确大小与独立 GPG 签名。公钥指纹固定为 `5230D3A7CCBEED4616D39C51FC6AD1BC63F7D4D8`，网络不能替换信任根。Manifest 要求助手版本与 service 协议兼容；无签名发布不能用于新安装或显式升级。已安装健康服务仍可连接，不查询发布。
+
+
+Android 11+ 可选择“本机”，通过本机无线调试配对、安装并以 shell 权限运行 nl2sh。支持自动发现与手动连接端口，Web 使用 `127.0.0.1` 的实际端口；详见[本机使用指南](docs/zh/guide.md#本机安装与启动)。

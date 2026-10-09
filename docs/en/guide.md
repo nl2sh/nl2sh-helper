@@ -82,3 +82,24 @@ Extension diagnostics also show JADX, Tailcat and update ownership from `/api/in
 ![Bridge and extension diagnostics; unauthenticated recommendations stay unknown](../assets/ui-bridge.png)
 
 An explicit update also records Helper ownership when the authenticated target binary already matches. It reuses the healthy service without pushing the file or restarting; ordinary Connect never changes ownership.
+
+## Install and run on this device
+
+Select Local (本机) on Android 11+ and enable Wireless debugging in Developer options. For first use, choose Pair device with pairing code and enter its temporary pairing port and six-digit code in the helper, preferably in split screen. Pairing and connections use `127.0.0.1`. After pairing, the helper discovers the local connection port. If self-discovery fails, enter the connection port shown on the main Wireless debugging page and retry with the pairing fields empty. These are different ports. Authorization identity survives discovery/install failures; pairing codes are never saved.
+
+Subsequent starts and local history connections discover the current port, falling back to the previous port. A manually entered connection port bypasses discovery. Re-enable wireless debugging after reboot if required by the device; pair again if authorization was revoked. Android 10 and older continue to support remote modes.
+
+Local mode shares release signature checks, ABI selection, deployment, rollback, service and Bridge management. The binary runs as shell at `/data/local/tmp/nl2sh`; Web health checks and browser URLs use `http://127.0.0.1:<actual-port>/`. The native service detaches from ADB and can continue after closing the helper until stopped, rebooted or killed by the system. The Web listener still binds all IPv4 interfaces.
+
+### Local end-to-end regression
+
+Run `LocalRuntimeTest` only on a disposable Android 11+ emulator with no runtime installed at the default path. Prepare the real x86_64 fixtures described above, install the debug and androidTest APKs, enable wireless debugging, and keep the pairing-code dialog active.
+
+```sh
+adb shell am instrument --user 0 -w -r -e class ernest.nl2sh.helper.LocalRuntimeTest \
+  -e disposable_local_device yes -e pairing_port PAIRING_PORT -e pairing_code PAIRING_CODE \
+  -e connection_port CONNECTION_PORT -e runtime_version RUNTIME_VERSION \
+  ernest.nl2sh.helper.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+The test uses real TLS pairing and loopback connections, checks shell UID, first installation, actual Web URL, history, PID reuse, restart and stop. Installation uses a prepared real binary fixture; release download and signature authentication have separate coverage. All 21 unit tests, debug/release builds and lint passed, alongside this test on API 35. Vendor ROM compatibility still needs device-specific validation.

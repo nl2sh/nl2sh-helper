@@ -4,7 +4,7 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
-internal enum class ConnectionMode { TCP, WIRELESS_CODE, WIRELESS_QR }
+internal enum class ConnectionMode { LOCAL, TCP, WIRELESS_CODE, WIRELESS_QR }
 
 /** Pairing codes and QR passwords are deliberately never persisted. */
 internal data class ConnectionRecord(
@@ -14,7 +14,7 @@ internal data class ConnectionRecord(
     val guid: String = "",
     val updatedAt: Long = System.currentTimeMillis(),
 ) {
-    val identity: String get() = if (mode == ConnectionMode.TCP) "TCP:$host:$port" else "${mode.name}:$guid"
+    val identity: String get() = if (mode == ConnectionMode.LOCAL) "LOCAL" else if (mode == ConnectionMode.TCP) "TCP:$host:$port" else "${mode.name}:$guid"
 }
 
 internal class ConnectionHistory(context: Context) {
@@ -37,7 +37,7 @@ internal class ConnectionHistory(context: Context) {
             val host = value.optString("host")
             val port = value.optInt("port")
             val guid = value.optString("guid")
-            if (host.isBlank() || port !in 1..65535 || (mode != ConnectionMode.TCP && guid.isBlank()))
+            if (host.isBlank() || port !in 1..65535 || (mode != ConnectionMode.TCP && mode != ConnectionMode.LOCAL && guid.isBlank()))
                 return@mapNotNull null
             ConnectionRecord(mode, host, port, guid, value.optLong("updatedAt"))
         }.sortedByDescending { it.updatedAt }

@@ -23,3 +23,5 @@ These show two scroll positions on a 320dp display, before verifying a target in
 Service management stacks Check updates, Restart, and Stop vertically, enabled after connecting. Dark confirmation dialogs explain effects. Stopping returns to ready; legacy service compatibility shows attention.
 
 The Android control card stacks diagnostics and five actions with at least 48dp targets. Drift uses a short warning label while version/service details stay neutral. Installation has a dark confirmation describing certificate checks, refusal on signature conflict, and manual activation. Unchecked or unauthenticated compatibility is explicitly unknown.
+
+Local is the default among four connection modes, normally arranged in two columns and stacked on narrow displays with large fonts. Its form includes Developer options, a pairing port, masked six-digit code and optional connection port. Instructions use neutral text; local history is separate.
