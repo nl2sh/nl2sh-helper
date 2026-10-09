@@ -1,62 +1,37 @@
 package ernest.nl2sh.helper
 
 import android.content.Intent
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.res.colorResource
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.semantics.*
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.*
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import ernest.nl2sh.helper.ui.*
 import ernest.ascrcpy.adb.AdbEndpoint
 import ernest.ascrcpy.adb.DefaultAdbClient
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 
 class MainActivity : ComponentActivity() {
+    private val ui = HelperUiState()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val history by lazy { ConnectionHistory(this) }
-    private var mode by mutableStateOf(ConnectionMode.LOCAL)
-    private var localPairingPort by mutableStateOf("")
-    private var localConnectionPort by mutableStateOf("")
-    private var localPairingCode by mutableStateOf("")
+    private var mode by ui::mode
+    private var localPairingPort by ui::localPairingPort
+    private var localConnectionPort by ui::localConnectionPort
+    private var localPairingCode by ui::localPairingCode
     private val localConnector by lazy { LocalDeviceConnector(applicationContext) }
-    private var host by mutableStateOf("")
-    private var port by mutableStateOf("5555")
-    private var pairingCode by mutableStateOf("")
-    private var status by mutableStateOf(UiStatus(StatusTone.IDLE, ""))
-    private var records by mutableStateOf(emptyList<ConnectionRecord>())
-    private var webUrl by mutableStateOf<String?>(null)
-    private var connectedRecord by mutableStateOf<ConnectionRecord?>(null)
-    private var bridgeSnapshot by mutableStateOf<BridgeSnapshot?>(null)
-    private var pendingBridgeInstall by mutableStateOf(false)
-    private var pendingDeviceAction by mutableStateOf<DeviceAction?>(null)
-    private var busy by mutableStateOf(false)
-    private var qrBitmap by mutableStateOf<Bitmap?>(null)
+    private var host by ui::host
+    private var port by ui::port
+    private var pairingCode by ui::pairingCode
+    private var status by ui::status
+    private var records by ui::records
+    private var webUrl by ui::webUrl
+    private var connectedRecord by ui::connectedRecord
+    private var bridgeSnapshot by ui::bridgeSnapshot
+    private var busy by ui::busy
+    private var qrBitmap by ui::qrBitmap
     private var activeJob: Job? = null
     private var qrDiscovery: QrPairingDiscovery? = null
 
@@ -64,8 +39,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val prefs = getSharedPreferences("connection", MODE_PRIVATE)
         webUrl = prefs.getString("web_url", null)
-        host = prefs.getString("host", "") ?: ""
-        port = prefs.getInt("port", 5555).toString()
+        host = savedInstanceState?.getString("host") ?: prefs.getString("host", "").orEmpty()
+        port = savedInstanceState?.getString("port") ?: prefs.getInt("port", 5555).toString()
         mode = savedInstanceState?.getString("mode")?.let { saved ->
             ConnectionMode.entries.firstOrNull { it.name == saved }
         } ?: ConnectionMode.LOCAL
@@ -82,232 +57,22 @@ class MainActivity : ComponentActivity() {
         refreshHistory()
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN or
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        setContent { Nl2shTheme { HelperScreen() } }
+        setContent { Nl2shTheme { HelperApp(ui, HelperActions(
+            selectMode = { mode = it; refreshHistory() },
+            connect = ::startSelectedAction,
+            openDeveloperOptions = {
+                runCatching { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) }
+                    .onFailure { showStatus("请在系统设置中手动打开开发者选项 → 无线调试。", StatusTone.WARNING) }
+            },
+            openPairingOverlay = ::openPairingOverlay,
+            connectHistory = { connectHistory(it) },
+            removeHistory = { history.remove(it); refreshHistory() },
+            manageBridge = ::manageBridge,
+            confirmDeviceAction = { action -> connectedRecord?.let { connectHistory(it, action) } },
+            cancelQr = ::cancelQrPairing,
+            openBrowser = { webUrl?.let { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) } },
+        )) } }
         acceptOverlayResult(intent)
-    }
-
-    @Composable private fun HelperScreen() {
-        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding(),
-            contentAlignment = Alignment.TopCenter) {
-            Column(Modifier.fillMaxWidth().widthIn(max = 640.dp).verticalScroll(rememberScrollState())
-                .imePadding().padding(horizontal = 20.dp, vertical = 24.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(painterResource(R.drawable.ic_launcher_art), null, Modifier.size(44.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Text(getString(R.string.app_name), color = MaterialTheme.colorScheme.primary,
-                        fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                }
-                Text("连接 Android 设备，部署 nl2sh 并打开 Web 界面。",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp,
-                    modifier = Modifier.padding(top = 12.dp))
-                ConnectionCard()
-                StatusCard()
-                ServiceCard()
-                BridgeCard()
-                HistoryCard()
-                ActionButton("在浏览器中打开 nl2sh", webUrl != null, Modifier.padding(top = 16.dp)) {
-                    webUrl?.let { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
-                }
-                Text("网络提示", color = colorResource(R.color.ui_warning), fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 20.dp))
-                Text("目标 Web 界面无需登录，请仅在可信网络使用。模型服务可在 Web 界面内配置。",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp,
-                    modifier = Modifier.padding(top = 6.dp))
-            }
-        }
-        qrBitmap?.let { QrDialog(it) }
-        if (pendingBridgeInstall) {
-            AlertDialog(onDismissRequest = { pendingBridgeInstall = false },
-                containerColor = MaterialTheme.colorScheme.surface,
-                title = { Text("安装 / 升级 Android Bridge") },
-                text = { Text("将按原生版本的签名 Manifest 验证并安装 Bridge，然后打开应用。已有签名不兼容时停止，不自动卸载。无障碍与键盘仍需你在目标设备手动启用。", modifier = Modifier.verticalScroll(rememberScrollState())) },
-                confirmButton = { TextButton(onClick = { pendingBridgeInstall = false; manageBridge(BridgeAction.INSTALL) }) { Text("确认安装") } },
-                dismissButton = { TextButton(onClick = { pendingBridgeInstall = false }) { Text("取消") } })
-        }
-        pendingDeviceAction?.let { action ->
-            val title = when (action) {
-                DeviceAction.UPDATE -> "检查更新并升级"
-                DeviceAction.RESTART -> "重启服务"
-                DeviceAction.STOP -> "停止服务"
-                DeviceAction.CONNECT -> "连接服务"
-            }
-            AlertDialog(onDismissRequest = { pendingDeviceAction = null },
-                containerColor = MaterialTheme.colorScheme.surface,
-                title = { Text(title) },
-                text = { Text(if (action == DeviceAction.UPDATE)
-                    "更新会校验暂存程序、保留旧程序并重启。失败时尝试恢复旧服务。配置和会话保留。"
-                    else "此操作会取消当前任务并结束待决审批。配置和会话保留。", modifier = Modifier.verticalScroll(rememberScrollState())) },
-                confirmButton = { TextButton(onClick = {
-                    pendingDeviceAction = null
-                    connectedRecord?.let { connectHistory(it, action) }
-                }) { Text("确认") } },
-                dismissButton = { TextButton(onClick = { pendingDeviceAction = null }) { Text("取消") } })
-        }
-    }
-
-    @Composable private fun ServiceCard() = CardSection("服务管理", 16) {
-        Text(connectedRecord?.let { "当前目标：${it.host}:${it.port}" } ?: "先连接设备以管理服务。",
-            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-        Text("连接复用健康服务；升级、重启和停止由独立动作发起。",
-            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
-        for ((label, action) in listOf("检查更新" to DeviceAction.UPDATE, "重启服务" to DeviceAction.RESTART, "停止服务" to DeviceAction.STOP)) {
-            ActionButton(label, !busy && connectedRecord != null, Modifier.padding(top = 8.dp),
-                action == DeviceAction.STOP) { pendingDeviceAction = action }
-        }
-    }
-
-    @Composable private fun BridgeCard() = CardSection("增强 Android 控制能力", 16) {
-        bridgeSnapshot?.let { snapshot ->
-            if (snapshot.drift) Text("Bridge 版本或协议与建议不一致", color = colorResource(R.color.ui_warning), fontSize = 14.sp)
-            Text(snapshot.describe(), color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp)
-        } ?: Text("Android Bridge 状态尚未检查。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-        Text("无障碍与键盘独立启用；助手仅打开设置，不代改系统开关。",
-            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
-        for ((label, action) in listOf("检查 Bridge" to BridgeAction.INSPECT, "打开 Bridge" to BridgeAction.OPEN_APP,
-            "打开无障碍设置" to BridgeAction.ACCESSIBILITY_SETTINGS, "打开键盘设置" to BridgeAction.KEYBOARD_SETTINGS)) {
-            ActionButton(label, !busy && connectedRecord != null, Modifier.padding(top = 8.dp)) { manageBridge(action) }
-        }
-        ActionButton("安装 / 升级 Bridge", !busy && connectedRecord != null, Modifier.padding(top = 8.dp)) { pendingBridgeInstall = true }
-    }
-
-    @OptIn(ExperimentalLayoutApi::class)
-    @Composable private fun ConnectionCard() = CardSection("连接设备", 20) {
-        val configuration = LocalConfiguration.current
-        val stackedModes = configuration.screenWidthDp < 480 && configuration.fontScale >= 1.3f
-        FlowRow(Modifier.fillMaxWidth().padding(top = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp),
-            maxItemsInEachRow = if (stackedModes) 1 else 2) {
-            ConnectionMode.entries.forEach { choice ->
-                val title = when (choice) { ConnectionMode.LOCAL -> "本机"; ConnectionMode.TCP -> "TCP"; ConnectionMode.WIRELESS_CODE -> "配对码"; ConnectionMode.WIRELESS_QR -> "二维码" }
-                val selected = choice == mode
-                OutlinedButton({ mode = choice; refreshHistory() }, enabled = !busy, shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp).semantics {
-                        this.selected = selected
-                        contentDescription = if (selected) "$title，当前连接方式" else "$title，切换连接方式"
-                    }, border = ButtonDefaults.outlinedButtonBorder(!busy).copy(
-                        width = if (selected) 2.dp else 1.dp,
-                        brush = SolidColor(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        disabledContainerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                    Text(if (selected) "✓ $title" else title, fontSize = 14.sp)
-                }
-            }
-        }
-        when (mode) {
-            ConnectionMode.LOCAL -> {
-                Text("通过本机无线调试以 shell 权限安装并启动 nl2sh。需要 Android 11+。首次在无线调试中选择使用配对码配对设备；可使用配对浮窗，无需分屏。以后可直接启动。", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 14.dp))
-                ActionButton("打开开发者选项", !busy, Modifier.padding(top = 8.dp)) {
-                    runCatching { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) }
-                        .onFailure { showStatus("请在系统设置中手动打开开发者选项 → 无线调试。", StatusTone.WARNING) }
-                }
-                ActionButton("打开配对浮窗", !busy, Modifier.padding(top = 8.dp)) { openPairingOverlay() }
-                Text("首次需允许显示在其他应用上层。若系统设置隐藏浮窗，可在配对通知中输入“端口 六位码”；需允许通知。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                Field("临时配对端口", localPairingPort, { localPairingPort = it }, KeyboardType.Number)
-                Field("六位配对码", localPairingCode, { localPairingCode = it }, KeyboardType.NumberPassword, true)
-                Field("连接端口（可选）", localConnectionPort, { localConnectionPort = it }, KeyboardType.Number)
-                Text("连接端口位于无线调试主页，与临时配对端口不同。已配对时留空配对端口和配对码。Web 使用 127.0.0.1。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-            }
-            ConnectionMode.TCP -> EndpointForm("在目标设备开启 TCP ADB，首次连接时批准 RSA 授权。", "目标设备地址", "ADB 端口")
-            ConnectionMode.WIRELESS_CODE -> {
-                EndpointForm("在目标设备的“开发者选项 → 无线调试”中选择“使用配对码配对设备”。输入临时配对地址、端口和六位配对码。", "配对地址", "临时配对端口")
-                Field("配对码", pairingCode, { pairingCode = it }, KeyboardType.NumberPassword, true)
-            }
-            ConnectionMode.WIRELESS_QR -> Text("两台设备连接同一 Wi-Fi。在目标设备的“无线调试 → 使用二维码配对设备”中扫描下方二维码。",
-                color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.padding(top = 14.dp))
-        }
-        ActionButton(if (busy) "正在处理…" else when (mode) {
-            ConnectionMode.LOCAL -> "启动 / 首次安装 nl2sh"; ConnectionMode.TCP -> "连接 / 首次安装"; ConnectionMode.WIRELESS_CODE -> "配对并连接"; ConnectionMode.WIRELESS_QR -> "显示配对二维码"
-        }, !busy, Modifier.padding(top = 16.dp), onClick = ::startSelectedAction)
-    }
-
-    @Composable private fun EndpointForm(description: String, hostLabel: String, portLabel: String) {
-        Text(description, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.padding(top = 14.dp))
-        Field(hostLabel, host, { host = it }, KeyboardType.Uri)
-        Field(portLabel, port, { port = it }, KeyboardType.Number)
-    }
-
-    @Composable private fun Field(label: String, value: String, onChange: (String) -> Unit,
-                                  keyboardType: KeyboardType, password: Boolean = false) {
-        OutlinedTextField(value, onChange, label = { Text(label) }, enabled = !busy, singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface))
-    }
-
-    @Composable private fun StatusCard() {
-        val toneColor = when (status.tone) {
-            StatusTone.IDLE -> MaterialTheme.colorScheme.onSurfaceVariant
-            StatusTone.WORKING -> MaterialTheme.colorScheme.primary
-            StatusTone.SUCCESS -> colorResource(R.color.ui_success)
-            StatusTone.WARNING -> colorResource(R.color.ui_warning)
-            StatusTone.ERROR -> MaterialTheme.colorScheme.error
-        }
-        Column(Modifier.fillMaxWidth().padding(top = 16.dp).clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, toneColor, RoundedCornerShape(8.dp)).padding(16.dp)
-            .semantics { liveRegion = LiveRegionMode.Polite }) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(status.tone.label, color = toneColor, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                if (status.tone == StatusTone.WORKING) CircularProgressIndicator(Modifier.size(20.dp), color = toneColor, strokeWidth = 2.dp)
-            }
-            Text(status.message, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
-        }
-    }
-
-    @Composable private fun HistoryCard() = CardSection("历史设备", 16) {
-        if (records.isEmpty()) Text("暂无历史设备。", color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
-        records.forEach { record ->
-            Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                Text("${record.host}:${record.port}", fontFamily = FontFamily.Monospace, fontSize = 14.sp)
-                if (record.guid.isNotEmpty()) Text(record.guid, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ActionButton("连接", !busy, Modifier.weight(1f)) { connectHistory(record) }
-                    ActionButton("删除记录", !busy, Modifier.weight(1f), true) { history.remove(record); refreshHistory() }
-                }
-            }
-        }
-    }
-
-    @Composable private fun CardSection(title: String, top: Int, content: @Composable () -> Unit) {
-        Column(Modifier.fillMaxWidth().padding(top = top.dp).clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)).padding(16.dp)) {
-            Text(title, color = MaterialTheme.colorScheme.secondary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            content()
-        }
-    }
-
-    @Composable private fun ActionButton(text: String, enabled: Boolean, modifier: Modifier = Modifier,
-                                         destructive: Boolean = false, onClick: () -> Unit) {
-        val active = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-        OutlinedButton(onClick, modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = enabled, shape = RoundedCornerShape(8.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                disabledContainerColor = MaterialTheme.colorScheme.surface,
-                contentColor = active,
-                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-            border = ButtonDefaults.outlinedButtonBorder(enabled).copy(brush = SolidColor(if (enabled) active else MaterialTheme.colorScheme.outline))) {
-            Text(text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        }
-    }
-
-    @Composable private fun QrDialog(bitmap: Bitmap) {
-        AlertDialog(onDismissRequest = ::cancelQrPairing, title = { Text("无线调试二维码配对") },
-            text = { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Image(bitmap.asImageBitmap(), "无线调试配对二维码",
-                    Modifier.fillMaxWidth().heightIn(max = 320.dp).background(androidx.compose.ui.graphics.Color.White).padding(16.dp))
-            } }, confirmButton = {}, dismissButton = { TextButton(onClick = ::cancelQrPairing) { Text("取消") } },
-            containerColor = MaterialTheme.colorScheme.surface)
     }
 
     private fun openPairingOverlay() {
@@ -565,6 +330,8 @@ class MainActivity : ComponentActivity() {
     private fun validHost(value: String) = value.length in 1..253 && value.matches(Regex("[A-Za-z0-9.-]+")) && !value.startsWith('-') && !value.endsWith('-') && !value.contains("..")
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("mode", mode.name)
+        outState.putString("host", host)
+        outState.putString("port", port)
         outState.putString("local_connection_port", localConnectionPort)
         connectedRecord?.let { record -> outState.putBundle("selected_device", Bundle().apply {
             putString("mode", record.mode.name); putString("host", record.host)
@@ -575,8 +342,6 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() { stopQrPairing(); scope.cancel(); super.onDestroy() }
 }
 
-internal data class UiStatus(val tone: StatusTone, val message: String)
-internal enum class StatusTone(val label: String) { IDLE("就绪"), WORKING("处理中"), SUCCESS("已启动"), WARNING("需注意"), ERROR("失败") }
 internal fun String.isTailscaleAddress(): Boolean {
     val normalized = trim().removePrefix("[").removeSuffix("]").lowercase()
     if (normalized.startsWith("fd7a:115c:a1e0:")) return true

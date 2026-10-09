@@ -1,5 +1,7 @@
 # Interface and visual conventions
 
+The Compose + Navigation3 interface has four functional tabs: Connection (连接), Service (服务), Bridge, and History (历史). Connection shows only the selected method's form; Service contains update, restart, stop and browser actions; Bridge contains diagnostics, installation and system settings; History filters by connection method and lazily renders records. Switching tabs retains input and each page's scroll position. Tabs remain accessible during work while duplicate operations stay disabled. Back returns from another tab to Connection; rotation restores the current tab without saving pairing secrets. Each page displays the shared operation status.
+
 The helper uses the same dark surfaces, neutral text and cyan/blue hierarchy as nl2sh, including when Android uses a light system theme. The launcher icon retains the brand gradients; functional screens use a shared semantic palette.
 
 TCP ADB, pairing code and QR code buttons identify the current connection method with a checkmark and blue outline. Code and QR modes both use Android wireless debugging. Selection is separate from availability: switching, input and deployment are disabled only while a task is running, with an explicit busy label.
@@ -12,13 +14,19 @@ The screen supports system font scaling and scrolling on narrow displays, stacki
 
 Contributors must read [UI_DESIGN.md](../../UI_DESIGN.md) and [AGENTS.md](../../AGENTS.md) before interface changes. The UI uses Jetpack Compose; colors live in `colors.xml`, while `themes.xml` and `Nl2shTheme.kt` manage the window and Compose semantic themes.
 
-## Screen examples
+## Page organization
 
-These show two scroll positions on a 320dp display, before verifying a target in the current session.
+Functional modules use separate pages instead of stacking every card in one scrolling screen.
 
-| Connection form | Status and service management |
+These four pages were captured on an API 35 emulator before connecting a target in this session. A saved browser URL does not establish service readiness.
+
+| Connection | Service |
 |---|---|
-| ![Connection form](../assets/ui-tcp.png) | ![Status and service management](../assets/ui-status.png) |
+| ![Connection](../assets/ui-tabs-connection.png) | ![Service](../assets/ui-tabs-service.png) |
+
+| Bridge | History |
+|---|---|
+| ![Bridge](../assets/ui-tabs-bridge.png) | ![History](../assets/ui-tabs-history.png) |
 
 Service management stacks Check updates, Restart, and Stop vertically, enabled after connecting. Dark confirmation dialogs explain effects. Stopping returns to ready; legacy service compatibility shows attention.
 

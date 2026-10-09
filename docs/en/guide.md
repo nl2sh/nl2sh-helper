@@ -4,6 +4,8 @@ The helper is an Android ADB client and Web launcher, separate from the Accessib
 
 ## Interface
 
+The Compose + Navigation3 interface has four functional tabs: Connection (连接), Service (服务), Bridge, and History (历史). Connection shows only the selected method's form; Service contains update, restart, stop and browser actions; Bridge contains diagnostics, installation and system settings; History filters by connection method and lazily renders records. Switching tabs retains input and each page's scroll position. Tabs remain accessible during work while duplicate operations stay disabled. Back returns from another tab to Connection; rotation restores the current tab without saving pairing secrets. Each page displays the shared operation status.
+
 Connection methods, status and history follow the shared nl2sh dark semantic design. See [Interface and visual conventions](design.md). A checkmark identifies the current mode; busy tasks disable duplicate actions. Details and errors wrap and scroll.
 
 ## Connect

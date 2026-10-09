@@ -1,5 +1,7 @@
 # nl2sh Helper
 
+The Compose + Navigation3 interface organizes connection, service, Bridge and history on four separate tabs.
+
 <img src="assets/icon.png" width="128" alt="nl2sh助手图标">
 
 [简体中文](README.md) | [English](README_EN.md)
