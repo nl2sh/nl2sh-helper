@@ -125,6 +125,10 @@ class MainActivity : ComponentActivity() {
     private fun refreshHistory() { records = history.list(mode) }
     private fun showStatus(message: String, tone: StatusTone) { status = UiStatus(tone, message) }
 
+    private fun showTransferProgress(progress: TransferProgress) = runOnUiThread {
+        if (busy && !isDestroyed) status = UiStatus(StatusTone.WORKING, progress.label, progress)
+    }
+
     private fun startSelectedAction() {
         when (mode) {
             ConnectionMode.LOCAL -> {
@@ -241,7 +245,7 @@ class MainActivity : ComponentActivity() {
         val current = if (record.mode == ConnectionMode.LOCAL) localConnector.reconnect(record) { showStatus(it, StatusTone.WORKING) } else if (record.mode == ConnectionMode.TCP) record else
             discoverConnection(record.guid, 10_000, routeHost = record.host.takeIf(String::isTailscaleAddress))
                 ?.let { record.copy(host = if (record.host.isTailscaleAddress()) record.host else it.host, port = it.port) } ?: record
-        val snapshot = DeviceBridgeManager(applicationContext).perform(current, action) { message ->
+        val snapshot = DeviceBridgeManager(applicationContext, progress = ::showTransferProgress).perform(current, action) { message ->
             withContext(Dispatchers.Main) { showStatus(message, StatusTone.WORKING) }
         }
         connectedRecord = current
@@ -298,7 +302,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private suspend fun install(record: ConnectionRecord, action: DeviceAction = DeviceAction.CONNECT) {
-        val result = DeviceInstaller(applicationContext).perform(record.host, record.port,
+        val result = DeviceInstaller(applicationContext, progress = ::showTransferProgress).perform(record.host, record.port,
             record.mode != ConnectionMode.TCP, action) { message ->
             withContext(Dispatchers.Main) { showStatus(message, StatusTone.WORKING) }
         }

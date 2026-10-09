@@ -8,6 +8,8 @@ import ernest.ascrcpy.adb.AdbEndpoint
 import ernest.ascrcpy.adb.DefaultAdbClient
 import java.io.File
 import java.security.MessageDigest
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -36,10 +38,11 @@ internal data class BridgeSnapshot(val nativeVersion: String?, val installed: Bo
 
 /** Explicit companion management never rewrites system Accessibility or keyboard settings. */
 internal class DeviceBridgeManager(private val context: Context,
+    private val progress: (TransferProgress) -> Unit = {},
     private val policyLoader: suspend (String, String) -> RuntimePolicy = { version, abi ->
         ReleaseRepository(context).policy("v$version", abi)
     },
-    private val artifactLoader: suspend (RuntimeAsset) -> File = { asset -> ReleaseRepository(context).cachedBridge(asset) }) {
+    private val artifactLoader: suspend (RuntimeAsset) -> File = { asset -> ReleaseRepository(context, progress).cachedBridge(asset) }) {
     suspend fun perform(record: ConnectionRecord, action: BridgeAction, report: suspend (String) -> Unit): BridgeSnapshot = withContext(Dispatchers.IO) {
         val client = DefaultAdbClient.factory(context).create()
         try {
@@ -74,13 +77,19 @@ internal class DeviceBridgeManager(private val context: Context,
                     run(client, "mkdir -p /data/local/tmp/nl2sh-helper")
                     val remote = "/data/local/tmp/nl2sh-helper/bridge.apk"
                     try {
-                        file.inputStream().use { input -> withTimeout(120_000) { client.push(input, remote) } }
+                        withTimeout(120_000) {
+                            val job = currentCoroutineContext()
+                            ProgressInputStream(file.inputStream(), "推送 Bridge ${asset.version}（等待设备确认）", file.length(), progress, { job.ensureActive() }).use { input -> client.push(input, remote) }
+                        }
+                        report("推送完成；核对设备暂存 APK 摘要…")
                         check(run(client, "toybox sha256sum $remote").substringBefore(' ').equals(asset.sha, true)) { "设备暂存 APK 摘要不一致，未安装。" }
                         run(client, "chmod 644 $remote")
+                        report("安装 Bridge ${asset.version}，等待系统安装结果…")
                         val result = run(client, "pm install -r $remote")
                         check(result.lineSequence().any { it.trim() == "Success" }) {
                             "Bridge 安装失败，已有应用保留。签名冲突需显式迁移，不会自动卸载：${result.take(300)}"
                         }
+                        report("安装完成；核对 Bridge 实际版本与协议…")
                         val installed = inspect(client, version, expected, null)
                         check(installed.version == asset.version && installed.protocol == asset.protocol) { "Bridge 安装后版本/协议不匹配。" }
                         run(client, "am start -n com.nl2sh.bridge/.MainActivity")

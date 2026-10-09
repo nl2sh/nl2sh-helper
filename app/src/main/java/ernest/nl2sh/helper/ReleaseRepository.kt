@@ -8,6 +8,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -19,7 +21,8 @@ internal data class RuntimeAsset(val version: String, val protocol: Int, val url
     val certificateSha: String? = null)
 internal data class RuntimePolicy(val version: String, val native: RuntimeAsset, val bridge: RuntimeAsset?)
 
-internal class ReleaseRepository(private val context: Context) {
+internal class ReleaseRepository(private val context: Context,
+    private val report: (TransferProgress) -> Unit = {}) {
     suspend fun latest(abi: String): ReleaseBinary = withContext(Dispatchers.IO) {
         require(abi in setOf("arm64-v8a", "armeabi-v7a", "x86_64"))
         val release = JSONObject(fetchText("https://api.github.com/repos/nl2sh/nl2sh/releases/latest", 512 * 1024))
@@ -57,14 +60,18 @@ internal class ReleaseRepository(private val context: Context) {
 
     suspend fun cachedBinary(release: ReleaseBinary): Pair<File, String> = withContext(Dispatchers.IO) {
         val asset = requireNotNull(release.authenticated) { "Unsigned release is not installable" }
+        report(TransferProgress("获取并验证发布签名…"))
+        val job = currentCoroutineContext()
         val signature = fetchBytes(asset.signatureUrl, 16_384)
         val verifier = trust()
         val file = ReleaseFileCache(File(context.filesDir, "releases"))
             .getOrDownload(release, asset.sha) { temp ->
-                download(asset.url, temp, 32_000_000)
+                download(asset.url, temp, 32_000_000, asset.size, "下载 nl2sh ${release.tag}") { job.ensureActive() }
+                report(TransferProgress("校验下载程序的大小与 GPG 签名…"))
                 require(temp.length() == asset.size) { "Release size mismatch" }
                 verifier.verify(temp.readBytes(), signature)
             }
+        report(TransferProgress("校验本地缓存的大小、SHA-256 与 GPG 签名…"))
         require(file.length() == asset.size) { "Cached release size mismatch" }
         verifier.verify(file.readBytes(), signature)
         file to asset.sha
@@ -75,18 +82,22 @@ internal class ReleaseRepository(private val context: Context) {
         val directory = File(context.filesDir, "bridge-releases")
         check(directory.mkdirs() || directory.isDirectory)
         val file = File(directory, "${asset.sha}.apk")
+        report(TransferProgress("获取并验证发布签名…"))
+        val job = currentCoroutineContext()
         val signature = fetchBytes(asset.signatureUrl, 16_384)
         val verifier = trust()
         fun verified(candidate: File): Boolean = candidate.isFile && candidate.length() == asset.size && sha256(candidate) == asset.sha
         if (!verified(file)) {
             val staged = File.createTempFile("bridge-", ".download", directory)
             try {
-                download(asset.url, staged, 64 * 1024 * 1024)
+                download(asset.url, staged, 64 * 1024 * 1024, asset.size, "下载 Bridge ${asset.version}") { job.ensureActive() }
+                report(TransferProgress("校验 Bridge 下载文件的大小、SHA-256 与 GPG 签名…"))
                 require(verified(staged)) { "Bridge size or SHA-256 mismatch" }
                 verifier.verify(staged.readBytes(), signature)
                 java.nio.file.Files.move(staged.toPath(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
             } finally { staged.delete() }
         }
+        report(TransferProgress("校验 Bridge 缓存与 GPG 签名…"))
         verifier.verify(file.readBytes(), signature)
         file
     }
@@ -111,26 +122,16 @@ internal class ReleaseRepository(private val context: Context) {
         throw lastError ?: IOException("Release request failed")
     }
 
-    private fun download(url: String, destination: File, limit: Int) {
+    private fun download(url: String, destination: File, limit: Int, size: Long,
+                         label: String, checkpoint: () -> Unit) {
         val connection = connect(url)
         try {
             connection.inputStream.use { input ->
                 FileOutputStream(destination).use { output ->
-                    val buffer = ByteArray(64 * 1024)
-                    var total = 0
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        total += count
-                        check(total <= limit) { "Download exceeds size limit" }
-                        output.write(buffer, 0, count)
-                    }
-                    check(total > 0) { "Empty nl2sh download" }
+                    copyRelease(input, output, size, limit, label, report, checkpoint)
                 }
             }
-        } finally {
-            connection.disconnect()
-        }
+        } finally { connection.disconnect() }
     }
 
     private fun connect(url: String): HttpURLConnection {

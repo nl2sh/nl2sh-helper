@@ -36,5 +36,17 @@ internal fun HelperUiState.StatusCard() {
             if (status.tone == StatusTone.WORKING) CircularProgressIndicator(Modifier.size(20.dp), color = toneColor, strokeWidth = 2.dp)
         }
         Text(status.message, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
+        if (status.tone == StatusTone.WORKING) {
+            val fraction = status.progress?.fraction
+            if (fraction != null) {
+                LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    color = MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.outline)
+                Text(requireNotNull(status.progress).description, color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
+            } else {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    color = MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.outline)
+            }
+        }
     }
 }

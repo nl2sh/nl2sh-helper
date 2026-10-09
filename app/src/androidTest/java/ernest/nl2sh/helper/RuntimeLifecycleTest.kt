@@ -38,11 +38,16 @@ class RuntimeLifecycleTest {
         assertEquals(before.getLong("pid"), info().getLong("pid"))
 
         val bad = fixture("bad-runtime")
-        val failed = DeviceInstaller(context) { abi ->
+        val transfers = mutableListOf<TransferProgress>()
+        val failed = DeviceInstaller(context, progress = transfers::add) { abi ->
             PreparedRelease(ReleaseBinary("v9.9.9", abi, "https://example.invalid/binary", "https://example.invalid/checksum"), bad, sha256(bad))
         }
         val error = runCatching { failed.perform(host, adbPort, false, DeviceAction.UPDATE) { } }.exceptionOrNull()
         assertNotNull(error)
+        val pushed = transfers.last { it.label.startsWith("推送") }
+        assertEquals(bad.length(), pushed.bytes)
+        assertEquals(bad.length(), pushed.total)
+        assertEquals(1f, pushed.fraction)
         assertTrue(requireNotNull(error).message!!.contains("已恢复旧程序"))
         val restored = info()
         assertEquals(before.getString("version"), restored.getString("version"))

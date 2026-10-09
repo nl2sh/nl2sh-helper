@@ -9,6 +9,8 @@ import java.net.HttpURLConnection
 import java.net.Proxy
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -29,8 +31,9 @@ internal data class NativeServiceState(val state: String, val pid: Long?, val ve
 internal data class PreparedRelease(val release: ReleaseBinary, val binary: File, val sha: String)
 
 internal class DeviceInstaller(private val context: Context,
+    private val progress: (TransferProgress) -> Unit = {},
     private val releaseLoader: suspend (String) -> PreparedRelease = { abi ->
-        val repository = ReleaseRepository(context)
+        val repository = ReleaseRepository(context, progress)
         val release = repository.latest(abi)
         val (binary, sha) = repository.cachedBinary(release)
         PreparedRelease(release, binary, sha)
@@ -108,14 +111,19 @@ internal class DeviceInstaller(private val context: Context,
         }
         runChecked(client, "mkdir -p $REMOTE_DIR")
         report("推送已校验程序；现有服务继续运行…")
-        binary.inputStream().use { source ->
-            withTimeout(120_000) { client.push(source, "$REMOTE_BINARY.download") }
+        withTimeout(120_000) {
+            val job = currentCoroutineContext()
+            ProgressInputStream(binary.inputStream(), "推送 nl2sh ${release.tag}（等待设备确认）", binary.length(), progress, { job.ensureActive() }).use { source ->
+                client.push(source, "$REMOTE_BINARY.download")
+            }
         }
+        report("推送完成；核对设备暂存程序摘要与版本…")
         runChecked(client, "chmod 755 $REMOTE_BINARY.download")
         check(remoteSha(client, "$REMOTE_BINARY.download") == expectedSha) { "暂存程序 SHA-256 校验失败，现有程序未替换。" }
         check(installedVersion(client, "$REMOTE_BINARY.download") == expectedVersion) { "暂存程序版本与发布不一致，现有程序未替换。" }
         val originalOwner = installed && runChecked(client, "test -f $REMOTE_BINARY.owner.json && printf owner || true") == "owner"
         if (installed) {
+            report("备份并校验现有程序；服务继续运行…")
             // Preserve the verified old binary before stopping or replacing it.
             runChecked(client, "cp $REMOTE_BINARY $REMOTE_BINARY.previous.download && chmod 755 $REMOTE_BINARY.previous.download")
             check(remoteSha(client, "$REMOTE_BINARY.previous.download") == originalSha) { "备份摘要不一致，现有程序未替换。" }
@@ -123,6 +131,7 @@ internal class DeviceInstaller(private val context: Context,
             if (originalOwner) runChecked(client, "cp $REMOTE_BINARY.owner.json $REMOTE_BINARY.owner.json.previous && chmod 600 $REMOTE_BINARY.owner.json.previous")
         }
         return guardedUpgrade(originalSha != null, promote = {
+            report("安装更新：停止受管服务并替换已校验程序…")
             if (installed) stop(client)
             runChecked(client, "mv -f $REMOTE_BINARY.download $REMOTE_BINARY")
             check(remoteSha(client, REMOTE_BINARY) == expectedSha) { "安装后摘要不一致。" }
@@ -132,6 +141,7 @@ internal class DeviceInstaller(private val context: Context,
             report("${release.tag} 已更新并通过版本及 Web 检查；旧程序保留用于回滚。")
             result
         }, restore = {
+            report("更新未完成；正在恢复旧程序与受管服务…")
             if (remoteSha(client, REMOTE_BINARY) != originalSha) {
                 // Require owned shutdown before restoring; never signal a PID by name.
                 stop(client, if (originalNative) "$REMOTE_BINARY.previous" else REMOTE_BINARY)

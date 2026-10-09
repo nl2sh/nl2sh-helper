@@ -24,6 +24,8 @@ Lifecycle protocol 1 uses `nl2sh service ... --json`. The helper builds the brow
 
 ## Installation and update procedure
 
+First installation, explicit updates and Bridge installation show download and upload progress in the status card: bytes, total size and percentage. Download totals come from the authenticated manifest. Upload counters track bytes actually consumed by the ADB send stream; 100% still requires device acknowledgement and checksum verification. Cache hits show verification without downloading again, and matching device checksums explicitly skip uploads. Verification, backup, installation, startup checks and recovery show their actual phase with an indeterminate bar rather than invented installation percentages. Failure, cancellation and completion remove progress while retaining the actual result; switching tabs keeps the shared status visible.
+
 1. Connect within 45 seconds and read the target ABI list. Native `x86_64` takes priority over translated ARM ABIs, followed by `arm64-v8a` and `armeabi-v7a`; x86 releases are unsupported.
 2. First installation or explicit update queries the latest `nl2sh/nl2sh` GitHub release, requiring matching `nl2sh-android-ABI` and `.sha256` assets over HTTPS. There is no version selector or Gitee fallback.
 3. Fetch and verify checksums even for private cache hits. Limits are 32,000,000 bytes for programs, 512 KiB for metadata, and 1024 bytes for checksums. Text I/O requests retry up to three times, rather than retrying the entire deployment.
@@ -49,6 +51,8 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 The application ID is `ernest.nl2sh.helper`. For local and GitHub Actions release signing, see [Signed builds and releases](releasing.md). Keep `local.properties`, build outputs and signing credentials out of Git. Unit tests cover ABI/ELF/checksum selection, caching, and cancellation/failure restoration. The emulator test below covers end-to-end lifecycle behavior; it does not establish vendor-device or wireless-pairing coverage.
+
+Progress regressions cover bounded downloads, truncated/oversized inputs, cancellation, send-stream counters, and resource cleanup. `TransferProgressUiTest` uses simulated byte counters to check download, upload, installation-wait, and failure displays. `RuntimeLifecycleTest` uses real ELF fixtures and ADB uploads to validate transfer counts and rollback without contacting production release servers.
 
 ## Reproducible lifecycle verification
 

@@ -37,3 +37,5 @@ Local is the default among four connection modes, normally arranged in two colum
 Local pairing has a dark draggable overlay for devices without Settings split-screen support. Dragging, collapse/expand, close and a scrollable form support narrow screens and large fonts. Six-digit codes stay masked and are never saved. Pairing completion is distinct from starting nl2sh; return to the helper to install/start. Inputs gain visible focus and open the keyboard only on touch.
 
 A notification reply fallback supports systems that hide overlays. The system reply editor has no application password mask; sent input is not echoed. Notification pairing status never implies a running nl2sh service.
+
+Downloads and ADB uploads show a progress bar, byte counters and percentage in the shared status card. Reaching 100% does not mean installation succeeded: device acknowledgement, signature/checksum checks, installation and startup phases follow. Cache hits show cache verification. Phases without measurable byte totals use an indeterminate bar; failure, cancellation or completion clears progress. nl2sh and Bridge installations share this display.

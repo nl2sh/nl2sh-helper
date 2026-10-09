@@ -38,12 +38,12 @@ class BridgeManagementTest {
             .joinToString("") { "%02x".format(it.toInt() and 255) }
         val artifact = RuntimeAsset(requireNotNull(info.versionName), 2, "https://example.invalid/bridge.apk",
             "https://example.invalid/bridge.apk.sig", sha256(apk), apk.length(), "com.nl2sh.bridge", certificate)
-        val manager = DeviceBridgeManager(context, { version, _ -> RuntimePolicy(version, artifact, artifact) }, { apk })
+        val manager = DeviceBridgeManager(context, policyLoader = { version, _ -> RuntimePolicy(version, artifact, artifact) }, artifactLoader = { apk })
         val before = manager.perform(record, BridgeAction.INSPECT) { }
         assertTrue(before.installed)
         assertEquals(2, before.protocol)
         assertFalse(before.drift)
-        val wrong = DeviceBridgeManager(context, { version, _ -> RuntimePolicy(version, artifact, artifact.copy(certificateSha = "0".repeat(64))) }, { apk })
+        val wrong = DeviceBridgeManager(context, policyLoader = { version, _ -> RuntimePolicy(version, artifact, artifact.copy(certificateSha = "0".repeat(64))) }, artifactLoader = { apk })
         val refusal = runCatching { wrong.perform(record, BridgeAction.INSTALL) { } }.exceptionOrNull()
         assertNotNull(refusal)
         assertTrue(requireNotNull(refusal).message.orEmpty().contains("certificate mismatch"))
