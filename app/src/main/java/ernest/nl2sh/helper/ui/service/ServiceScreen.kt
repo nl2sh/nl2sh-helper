@@ -53,7 +53,8 @@ internal fun HelperUiState.DoctorCard(actions: HelperActions) {
         Text("只读检查当前目标的连接、服务、协议与 Bridge；不会自动安装、启动或修改系统设置。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
         ActionButton("一键诊断", !busy, Modifier.padding(top = 8.dp), onClick = actions.diagnose)
         doctorReport?.let { report ->
-            Text("诊断目标：${report.target.host}:${report.target.port}（本次快照）", modifier = Modifier.padding(top = 12.dp))
+            Text("诊断目标：${report.target.host}:${report.target.port}（本次快照）", color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(top = 12.dp))
             report.checks.forEach { check ->
                 val tone = when (check.state) {
                     DoctorState.OK -> colorResource(R.color.ui_success)

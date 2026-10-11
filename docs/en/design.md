@@ -45,3 +45,5 @@ Offline cache installation finishes with a warning identifying the cached versio
 The Connection model form uses the existing theme and scrolling layout, masks API Keys and provides a clear remembered settings action. Inputs are disabled during work.
 
 Service diagnostics use scrollable per-check status and separate repair buttons. Short labels distinguish passed, needs attention and unknown; details stay neutral. Reports name the target and snapshot without claiming every service is online. Connection diagnostics switch to Service; Bridge repair switches to Bridge.
+
+The diagnostic target explicitly uses the theme body color, avoiding black text inherited from a default content color on dark cards.

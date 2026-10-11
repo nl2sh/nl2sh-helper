@@ -135,3 +135,7 @@ adb shell am instrument --user 0 -w -r -e class ernest.nl2sh.helper.LocalRuntime
 逐项展示 ADB 授权/连接、实际 UID、API/ABI、nl2sh 版本、受管服务 PID/实际端口、运行 ELF 摘要与磁盘程序一致性、控制端 Web 身份、MCP/A2A 和 Bridge/无障碍/输入法。结果为“通过”“需处理”“未知”；权限不足、超时、旧版不支持或缺失证据不会被判断为健康。协议进程运行不证明控制端鉴权可用，Bridge 可选能力未启用也不代表 shell 基础能力不可用。
 
 修复按钮是独立用户动作，连接/安装、服务重启确认、Bridge 管理和系统设置沿用原流程。Web 设置入口只使用本次身份验证过的 URL；打开设置不自动写入。结果是本次目标的快照，修复后需重新诊断。ADB 连接失败时显示授权和连接排查指引；已有设备、配置、服务与历史不由诊断改变。
+
+可复现目标验收：在一次性控制端设备上运行 `DeviceDoctorTargetTest`，显式传入 `acceptance_target=yes`、`target_host`、`adb_port`、实际 `web_port` 与待验 ELF 的 `runtime_sha256`。控制端须同时能访问目标 ADB 和原生 Web 端口；模拟器可使用宿主机转发和 `10.0.2.2`。测试验证真实诊断结果及重复连接保持服务 PID，不查询发布。测试不会安装缺失的原生程序；须先部署并核对测试运行端。`bridge_unavailable=yes` 仅用于明确未启用 Bridge 服务的目标，验证其不会被误报为正常。
+
+完整界面 smoke test 使用 `scripts/doctor-ui-smoke.py`：显式指定 `--serial`、`--package`、`--target-host`、`--adb-port`、`--profile`、私有 `--output` 和 `--disposable-controller`。在一次性模拟器上预先设置屏幕尺寸、系统字体和旋转；脚本通过实际界面输入 TCP 地址、点击只读诊断、滚动报告并检查键盘修复入口的 48dp 区域，保存截图与结构化结果。该案例要求目标 Bridge 输入法未选中；它不点击安装、修复或服务管理动作，不等同无线配对、首次部署或修复执行验收。
