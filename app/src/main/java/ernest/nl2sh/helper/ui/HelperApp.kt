@@ -71,8 +71,15 @@ internal fun HelperApp(state: HelperUiState, actions: HelperActions) {
                             ModulePage {
                                 with(state) {
                                     when (key) {
-                                        HelperDestination.CONNECTION -> ConnectionScreen(actions)
-                                        HelperDestination.SERVICE -> ServiceScreen(actions)
+                                        HelperDestination.CONNECTION -> ConnectionScreen(actions.copy(diagnoseSelected = {
+                                            actions.diagnoseSelected()
+                                            focus.clearFocus()
+                                            selectedName = HelperDestination.SERVICE.name
+                                        }))
+                                        HelperDestination.SERVICE -> ServiceScreen(actions.copy(repairDoctor = { repair ->
+                                            actions.repairDoctor(repair)
+                                            if (repair == ernest.nl2sh.helper.DoctorRepair.BRIDGE) selectedName = HelperDestination.BRIDGE.name
+                                        }))
                                         HelperDestination.BRIDGE -> BridgeScreen(actions)
                                         HelperDestination.HISTORY -> Unit
                                     }

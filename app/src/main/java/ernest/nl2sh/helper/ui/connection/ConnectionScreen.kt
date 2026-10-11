@@ -54,6 +54,7 @@ internal fun HelperUiState.ConnectionScreen(actions: HelperActions) = CardSectio
     ActionButton(if (busy) "正在处理…" else when (mode) {
         ConnectionMode.LOCAL -> "启动 / 首次安装 nl2sh"; ConnectionMode.TCP -> "连接 / 首次安装"; ConnectionMode.WIRELESS_CODE -> "配对并连接"; ConnectionMode.WIRELESS_QR -> "显示配对二维码"
     }, !busy, Modifier.padding(top = 16.dp), onClick = actions.connect)
+    ActionButton("只读诊断（详情见服务页）", !busy, Modifier.padding(top = 8.dp), onClick = actions.diagnoseSelected)
 }
 
 @Composable

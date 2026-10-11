@@ -20,6 +20,7 @@ internal class HelperUiState {
     var records by mutableStateOf(emptyList<ConnectionRecord>())
     var webUrl by mutableStateOf<String?>(null)
     var connectedRecord by mutableStateOf<ConnectionRecord?>(null)
+    var doctorReport by mutableStateOf<DoctorReport?>(null)
     var bridgeSnapshot by mutableStateOf<BridgeSnapshot?>(null)
     var pendingBridgeInstall by mutableStateOf(false)
     var pendingDeviceAction by mutableStateOf<DeviceAction?>(null)
@@ -28,6 +29,9 @@ internal class HelperUiState {
 }
 
 internal data class HelperActions(
+    val diagnoseSelected: () -> Unit,
+    val diagnose: () -> Unit,
+    val repairDoctor: (DoctorRepair) -> Unit,
     val clearLlmConfig: () -> Unit,
     val selectMode: (ConnectionMode) -> Unit,
     val connect: () -> Unit,

@@ -43,3 +43,5 @@ Downloads and ADB uploads show a progress bar, byte counters and percentage in t
 Offline cache installation finishes with a warning identifying the cached version and unconfirmed freshness. Targets at the same or a newer version keep their existing executable.
 
 The Connection model form uses the existing theme and scrolling layout, masks API Keys and provides a clear remembered settings action. Inputs are disabled during work.
+
+Service diagnostics use scrollable per-check status and separate repair buttons. Short labels distinguish passed, needs attention and unknown; details stay neutral. Reports name the target and snapshot without claiming every service is online. Connection diagnostics switch to Service; Bridge repair switches to Bridge.

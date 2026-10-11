@@ -142,6 +142,10 @@ internal class DeviceBridgeManager(private val context: Context,
         }
     }
 
+    /** Installed-only probe for Doctor; no release metadata, downloads or system writes. */
+    internal suspend fun inspectInstalled(client: AdbClient, native: String?): BridgeSnapshot =
+        inspect(client, native, null, null)
+
     private suspend fun inspect(client: AdbClient, native: String?, expected: RuntimeAsset?, note: String?): BridgeSnapshot {
         val installed = run(client, "pm path com.nl2sh.bridge 2>/dev/null || true").startsWith("package:")
         val enabledAccessibility = run(client, "settings get secure enabled_accessibility_services")
@@ -153,7 +157,10 @@ internal class DeviceBridgeManager(private val context: Context,
             val reply = run(client, "content call --uri content://com.nl2sh.bridge.ops --method capabilities")
             val encoded = requireNotNull(Regex("data=([A-Za-z0-9_-]+)").find(reply)).groupValues[1]
             JSONObject(Base64.decode(encoded, Base64.URL_SAFE or Base64.NO_WRAP).toString(Charsets.UTF_8))
-        }.getOrNull() else null
+        }.getOrElse { error ->
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            null
+        } else null
         val installedVersion = caps?.optString("app_version")?.takeIf { it.isNotBlank() }
             ?: if (installed) Regex("versionName=([^\\s]+)").find(run(client, "dumpsys package com.nl2sh.bridge | grep versionName"))?.groupValues?.get(1) else null
         val services = caps?.optJSONObject("services")

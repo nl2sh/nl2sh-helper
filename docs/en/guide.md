@@ -127,3 +127,11 @@ Connection accepts provider, model, API Key and endpoint, matching install-andro
 Connection/update actions remember valid settings even if the subsequent connection fails. The same helper reuses them for another target device. API Keys use Android Keystore AES-GCM encryption in private, backup-excluded storage and are never logged. Clear remembered settings retains target configuration. Uninstalling or clearing app data removes preferences; they do not sync to another phone running the helper.
 
 Only first deployment with no /data/local/tmp/config.toml initializes configuration with mode 600. Keys travel as ADB file bytes, never shell arguments. Existing configuration, reconnects, restarts and updates retain target model settings. Use Web settings to change an installed target.
+
+## One-click device diagnostics
+
+Connection offers read-only diagnostics and switches to Service for details. Service can inspect the current target. TCP accepts a directly entered address without installing first; other modes require prior pairing and connection. Diagnostics do not query releases, install/start services, change settings or read model keys/protocol tokens.
+
+Checks cover ADB authorization/connectivity, actual UID, API/ABI, nl2sh version, native service PID/port, running ELF versus installed file digest, controller Web identity, MCP/A2A and Bridge/accessibility/IME. Results distinguish passed, needs attention and unknown. Missing evidence, permission failures, timeouts and unsupported legacy versions never imply health. A running protocol process does not prove remote authentication/reachability; optional Bridge capability gaps do not invalidate basic shell capabilities.
+
+Repair buttons are separate user actions using existing connection/installation, restart confirmation, Bridge management and system settings flows. Web settings use only the URL verified during this inspection. Opening settings never writes automatically. Reports are target snapshots: inspect again after repairs. ADB connection failure returns authorization/connectivity guidance. Diagnostics do not change installations, configuration, services or history.

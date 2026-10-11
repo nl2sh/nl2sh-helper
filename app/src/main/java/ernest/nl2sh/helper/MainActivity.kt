@@ -63,6 +63,9 @@ class MainActivity : ComponentActivity() {
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN or
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         setContent { Nl2shTheme { HelperApp(ui, HelperActions(
+            diagnose = { diagnoseDevice() },
+            diagnoseSelected = { diagnoseDevice(true) },
+            repairDoctor = ::repairDoctor,
             clearLlmConfig = {
                 runCatching { llmPreferences.clear() }.onSuccess {
                     ui.llmProvider = "openrouter"; ui.llmModel = ""; ui.llmApiKey = ""; ui.llmEndpoint = ""
@@ -251,6 +254,39 @@ class MainActivity : ComponentActivity() {
         install(current, action)
     }
 
+    private fun diagnoseDevice(fromConnection: Boolean = false) = runAction {
+        ui.doctorReport = null
+        val selected = (if (fromConnection) connectedRecord?.takeIf { it.mode == mode && mode != ConnectionMode.TCP } else connectedRecord) ?: if (mode == ConnectionMode.TCP) {
+            val endpoint = inputEndpoint() ?: return@runAction
+            ConnectionRecord(ConnectionMode.TCP, endpoint.host, endpoint.port)
+        } else {
+            showStatus("请先配对并连接目标设备；TCP 可直接填写地址后诊断。", StatusTone.IDLE)
+            return@runAction
+        }
+        val current = if (selected.mode == ConnectionMode.LOCAL) localConnector.reconnect(selected) { showStatus(it, StatusTone.WORKING) }
+            else if (selected.mode == ConnectionMode.TCP) selected else
+            discoverConnection(selected.guid, 10_000, routeHost = selected.host.takeIf(String::isTailscaleAddress))
+                ?.let { selected.copy(host = if (selected.host.isTailscaleAddress()) selected.host else it.host, port = it.port) } ?: selected
+        val report = DeviceDoctor(applicationContext).inspect(current)
+        ui.doctorReport = report
+        showStatus("只读诊断完成；详情见服务页，修复需显式选择动作。",
+            if (report.needsAttention) StatusTone.WARNING else StatusTone.IDLE)
+    }
+
+    private fun repairDoctor(repair: DoctorRepair) {
+        val target = ui.doctorReport?.target ?: return
+        if (busy) return
+        // Repair is a separate user action; diagnostics never install or change settings.
+        when (repair) {
+            DoctorRepair.CONNECT -> connectHistory(target)
+            DoctorRepair.RESTART -> { connectedRecord = target; ui.pendingDeviceAction = DeviceAction.RESTART }
+            DoctorRepair.BRIDGE -> { connectedRecord = target; manageBridge(BridgeAction.INSPECT) }
+            DoctorRepair.ACCESSIBILITY -> { connectedRecord = target; manageBridge(BridgeAction.ACCESSIBILITY_SETTINGS) }
+            DoctorRepair.KEYBOARD -> { connectedRecord = target; manageBridge(BridgeAction.KEYBOARD_SETTINGS) }
+            DoctorRepair.WEB -> ui.doctorReport?.verifiedWebUrl?.let { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
+        }
+    }
+
     private fun manageBridge(action: BridgeAction) = runAction {
         val record = requireNotNull(connectedRecord) { "请先连接目标设备。" }
         val current = if (record.mode == ConnectionMode.LOCAL) localConnector.reconnect(record) { showStatus(it, StatusTone.WORKING) } else if (record.mode == ConnectionMode.TCP) record else
@@ -321,7 +357,7 @@ class MainActivity : ComponentActivity() {
             record.mode != ConnectionMode.TCP, action) { message ->
             withContext(Dispatchers.Main) { showStatus(message, StatusTone.WORKING) }
         }
-        if (connectedRecord != record) bridgeSnapshot = null
+        if (connectedRecord != record) { bridgeSnapshot = null; ui.doctorReport = null }
         connectedRecord = record
         result.url?.let { webUrl = it }
         history.save(record)
