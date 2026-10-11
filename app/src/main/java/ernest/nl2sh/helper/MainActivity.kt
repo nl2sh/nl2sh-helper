@@ -16,6 +16,7 @@ import kotlinx.coroutines.channels.Channel
 class MainActivity : ComponentActivity() {
     private val ui = HelperUiState()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val llmPreferences by lazy { InstallLlmPreferences(this) }
     private val history by lazy { ConnectionHistory(this) }
     private var mode by ui::mode
     private var localPairingPort by ui::localPairingPort
@@ -54,10 +55,20 @@ class MainActivity : ComponentActivity() {
         showStatus(webUrl?.let { "已保存上次地址：$it\n可打开浏览器；目标服务当前是否在线尚未检查。" }
             ?: "选择连接方式，填写目标设备信息后开始。", StatusTone.IDLE)
         localConnectionPort = savedInstanceState?.getString("local_connection_port").orEmpty()
+        runCatching { llmPreferences.load() }.onSuccess { config ->
+            ui.llmProvider = config.provider; ui.llmModel = config.model
+            ui.llmApiKey = config.apiKey; ui.llmEndpoint = config.endpoint
+        }.onFailure { showStatus("无法读取保存的模型参数，请清除后重新输入。", StatusTone.WARNING) }
         refreshHistory()
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN or
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         setContent { Nl2shTheme { HelperApp(ui, HelperActions(
+            clearLlmConfig = {
+                runCatching { llmPreferences.clear() }.onSuccess {
+                    ui.llmProvider = "openrouter"; ui.llmModel = ""; ui.llmApiKey = ""; ui.llmEndpoint = ""
+                    showStatus("已清除记住的模型参数；目标设备配置保留。", StatusTone.IDLE)
+                }.onFailure { showStatus("无法清除保存的模型参数。", StatusTone.ERROR) }
+            },
             selectMode = { mode = it; refreshHistory() },
             connect = ::startSelectedAction,
             openDeveloperOptions = {
@@ -302,7 +313,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private suspend fun install(record: ConnectionRecord, action: DeviceAction = DeviceAction.CONNECT) {
-        val result = DeviceInstaller(applicationContext, progress = ::showTransferProgress).perform(record.host, record.port,
+        val config = InstallLlmConfig(ui.llmProvider, ui.llmModel, ui.llmApiKey, ui.llmEndpoint)
+        if (action == DeviceAction.CONNECT || action == DeviceAction.UPDATE) {
+            withContext(Dispatchers.IO) { llmPreferences.save(config) }
+        }
+        val result = DeviceInstaller(applicationContext, progress = ::showTransferProgress, llmConfig = config).perform(record.host, record.port,
             record.mode != ConnectionMode.TCP, action) { message ->
             withContext(Dispatchers.Main) { showStatus(message, StatusTone.WORKING) }
         }

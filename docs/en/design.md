@@ -41,3 +41,5 @@ A notification reply fallback supports systems that hide overlays. The system re
 Downloads and ADB uploads show a progress bar, byte counters and percentage in the shared status card. Reaching 100% does not mean installation succeeded: device acknowledgement, signature/checksum checks, installation and startup phases follow. Cache hits show cache verification. Phases without measurable byte totals use an indeterminate bar; failure, cancellation or completion clears progress. nl2sh and Bridge installations share this display.
 
 Offline cache installation finishes with a warning identifying the cached version and unconfirmed freshness. Targets at the same or a newer version keep their existing executable.
+
+The Connection model form uses the existing theme and scrolling layout, masks API Keys and provides a clear remembered settings action. Inputs are disabled during work.

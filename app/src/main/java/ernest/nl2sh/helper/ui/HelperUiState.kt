@@ -5,6 +5,10 @@ import androidx.compose.runtime.*
 import ernest.nl2sh.helper.*
 
 internal class HelperUiState {
+    var llmProvider by mutableStateOf("openrouter")
+    var llmModel by mutableStateOf("")
+    var llmApiKey by mutableStateOf("")
+    var llmEndpoint by mutableStateOf("")
     var mode by mutableStateOf(ConnectionMode.LOCAL)
     var localPairingPort by mutableStateOf("")
     var localConnectionPort by mutableStateOf("")
@@ -24,6 +28,7 @@ internal class HelperUiState {
 }
 
 internal data class HelperActions(
+    val clearLlmConfig: () -> Unit,
     val selectMode: (ConnectionMode) -> Unit,
     val connect: () -> Unit,
     val openDeveloperOptions: () -> Unit,

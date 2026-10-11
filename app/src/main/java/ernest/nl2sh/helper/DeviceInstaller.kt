@@ -31,6 +31,7 @@ internal data class NativeServiceState(val state: String, val pid: Long?, val ve
 internal data class PreparedRelease(val release: ReleaseBinary, val binary: File, val sha: String, val cacheNotice: String? = null)
 
 internal class DeviceInstaller(private val context: Context,
+    private val llmConfig: InstallLlmConfig? = null,
     private val progress: (TransferProgress) -> Unit = {},
     private val releaseLoader: suspend (String) -> PreparedRelease = { abi ->
         val repository = ReleaseRepository(context, progress)
@@ -140,6 +141,10 @@ internal class DeviceInstaller(private val context: Context,
             runChecked(client, "mv -f $REMOTE_BINARY.download $REMOTE_BINARY")
             check(remoteSha(client, REMOTE_BINARY) == expectedSha) { "安装后摘要不一致。" }
             writeOwner(client, expectedVersion, expectedSha)
+            if (!installed && llmConfig != null) {
+                report("初始化模型配置；已有配置保持不变…")
+                writeInitialLlmConfig(client, llmConfig)
+            }
             val result = startAndCheck(client, host, expectedVersion, report).copy(notice = prepared.cacheNotice)
             runChecked(client, "rm -f $LEGACY_REMOTE_BINARY")
             report("${release.tag} 已更新并通过版本及 Web 检查；旧程序保留用于回滚。")
@@ -160,6 +165,20 @@ internal class DeviceInstaller(private val context: Context,
                 startAndCheck(client, host, originalVersion) { }
             }
         })
+    }
+
+    private suspend fun writeInitialLlmConfig(client: AdbClient, config: InstallLlmConfig) {
+        val path = "/data/local/tmp/config.toml"
+        if (runChecked(client, "test -e $path && printf exists || true") == "exists") return
+        // Transfer secrets as file bytes, never shell arguments or diagnostic output.
+        val temporary = "$REMOTE_DIR/install-private/config.tmp"
+        try {
+            runChecked(client, "umask 077; mkdir -p $REMOTE_DIR/install-private && chmod 700 $REMOTE_DIR/install-private && : > $temporary && chmod 600 $temporary")
+            config.toml().byteInputStream().use { client.push(it, temporary) }
+            runChecked(client, "chmod 600 $temporary && if [ ! -e $path ]; then ln $temporary $path; fi")
+        } finally {
+            withContext(kotlinx.coroutines.NonCancellable) { runChecked(client, "rm -f $temporary") }
+        }
     }
 
     private suspend fun writeOwner(client: AdbClient, version: String, sha: String) {

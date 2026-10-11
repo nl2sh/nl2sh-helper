@@ -33,7 +33,7 @@ First installation, explicit updates and Bridge installation show download and u
 5. The new service must pass target version, actual PID/port, and controller Web checks. Failure or cancellation attempts restoration before closing the ADB client: stop the new owned service, quarantine `nl2sh.failed`, verify and restore previous, and check the old service version. Report incomplete rollback honestly and retain files. A lost ADB connection, permission failures, or a corrupt backup may require manual recovery.
 6. Successful deployment writes adjacent `nl2sh.owner.json` containing Helper ownership, version, checksum, and GitHub source, without pairing secrets or model credentials. Keep previous until the next update; clean the legacy helper-directory binary only after success.
 
-The default binary path is `/data/local/tmp/nl2sh`. No `--config` or API key is supplied; nl2sh applies its own configuration lookup. Native service locks, state, and logs live in `config.service/` beside the default configuration. Legacy `helper.pid` and `nl2sh-web.log` remain under `/data/local/tmp/nl2sh-helper/`. Open the returned actual URL on the controller to configure the provider and use the Agent.
+The default binary path is `/data/local/tmp/nl2sh`. No `--config` argument is supplied; first installations can initialize model settings using nl2sh’s default configuration lookup. Native service locks, state, and logs live in `config.service/` beside the default configuration. Legacy `helper.pid` and `nl2sh-web.log` remain under `/data/local/tmp/nl2sh-helper/`. Open the returned actual URL on the controller to configure the provider and use the Agent.
 
 ## Verified cache fallback
 
@@ -119,3 +119,11 @@ The overlay uses a foreground service started only by the user; its notification
 Some systems (including the tested API 35 Settings app) forcibly hide normal overlays. Keep the pairing-code dialog open, pull down notifications and choose Enter pairing details in the helper notification. Send the temporary pairing port, a space and the current six-digit code. Tap Return to helper after success. Allow notification permission for this fallback. The reply editor is system-rendered and has no app-defined password mask; the helper immediately replaces the notification without echoing input. The fallback shares the overlay pairing logic and never saves codes.
 
 Overlay acceptance on API 35 covered dragging, collapse/expand, close, input errors, numeric keyboard focus, scrolling at 320dp with 2x fonts, and landscape. Settings forcibly hid the overlay, so real TLS pairing was verified through the notification fallback. Returning to the helper removed the window and foreground service; only GUID and connection port persisted. Vendor Settings compatibility remains device-specific.
+
+## Installer model settings
+
+Connection accepts provider, model, API Key and endpoint, matching install-android.sh. Providers: openrouter (default), openai, deepseek, moonshot (kimi), siliconflow, ollama and custom. Empty model/endpoint use installer defaults; custom requires an endpoint. API Key may be empty. The default Ollama endpoint refers to localhost on the target.
+
+Connection/update actions remember valid settings even if the subsequent connection fails. The same helper reuses them for another target device. API Keys use Android Keystore AES-GCM encryption in private, backup-excluded storage and are never logged. Clear remembered settings retains target configuration. Uninstalling or clearing app data removes preferences; they do not sync to another phone running the helper.
+
+Only first deployment with no /data/local/tmp/config.toml initializes configuration with mode 600. Keys travel as ADB file bytes, never shell arguments. Existing configuration, reconnects, restarts and updates retain target model settings. Use Web settings to change an installed target.

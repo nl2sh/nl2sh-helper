@@ -30,3 +30,5 @@ Release downloads authenticate the compatibility manifest first, then verify the
 
 
 On Android 11+, Local mode pairs with this device over wireless debugging and installs/runs nl2sh as shell. It supports a draggable pairing overlay without split screen, discovery and manual connection ports; Web uses the actual port on `127.0.0.1`. See the [local guide](docs/en/guide.md#install-and-run-on-this-device).
+
+Installer provider, model, API Key and endpoint settings are remembered for other target devices. See [installer model settings](docs/en/guide.md#installer-model-settings).

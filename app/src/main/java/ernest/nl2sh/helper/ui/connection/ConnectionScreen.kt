@@ -44,6 +44,13 @@ internal fun HelperUiState.ConnectionScreen(actions: HelperActions) = CardSectio
         ConnectionMode.WIRELESS_QR -> Text("两台设备连接同一 Wi-Fi。在目标设备的“无线调试 → 使用二维码配对设备”中扫描下方二维码。",
             color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.padding(top = 14.dp))
     }
+    Text("首次安装的模型设置", color = MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(top = 16.dp))
+    Text("provider：openrouter、openai、deepseek、moonshot（kimi）、siliconflow、ollama、custom。参数会记住并复用于其他目标设备；已有配置保持不变。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+    Field("LLM provider", llmProvider, { llmProvider = it }, KeyboardType.Text)
+    Field("model（留空使用 provider 默认值）", llmModel, { llmModel = it }, KeyboardType.Text)
+    Field("API Key（可选，加密保存）", llmApiKey, { llmApiKey = it }, KeyboardType.Password, true)
+    Field("endpoint（custom 必填，其他可选）", llmEndpoint, { llmEndpoint = it }, KeyboardType.Uri)
+    ActionButton("清除记住的模型参数", !busy, Modifier.padding(top = 8.dp), onClick = actions.clearLlmConfig)
     ActionButton(if (busy) "正在处理…" else when (mode) {
         ConnectionMode.LOCAL -> "启动 / 首次安装 nl2sh"; ConnectionMode.TCP -> "连接 / 首次安装"; ConnectionMode.WIRELESS_CODE -> "配对并连接"; ConnectionMode.WIRELESS_QR -> "显示配对二维码"
     }, !busy, Modifier.padding(top = 16.dp), onClick = actions.connect)

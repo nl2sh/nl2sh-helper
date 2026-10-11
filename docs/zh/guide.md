@@ -33,7 +33,7 @@
 5. 新服务必须通过目标版本、实际 PID/端口及控制端 Web 检查。失败或取消时，在关闭 ADB 客户端前尝试停止新服务、隔离 `nl2sh.failed`、校验并恢复 previous，再检查旧版本服务。不能完成回滚时如实报告，保留文件供检查；断开 ADB、权限异常或损坏备份可能需要人工恢复，不能声称已恢复。
 6. 成功后记录相邻 `nl2sh.owner.json`，包括 Helper 归属、版本、摘要和 GitHub 来源，不包含 ADB 配对秘密或模型凭据。previous 保留到下一次更新；旧助手目录内的程序仅在成功后清理。
 
-程序默认位于 `/data/local/tmp/nl2sh`。助手不传 `--config`、不提供 API Key；nl2sh 使用自身默认配置规则。原生 service 的锁、状态和日志位于默认配置旁的 `config.service/`；兼容旧服务的 `helper.pid` 与 `nl2sh-web.log` 位于 `/data/local/tmp/nl2sh-helper/`。在控制端打开返回的实际 URL，配置模型并使用 Agent。
+程序默认位于 `/data/local/tmp/nl2sh`。助手不传 `--config`；首次安装可初始化模型参数，nl2sh 使用自身默认配置规则。原生 service 的锁、状态和日志位于默认配置旁的 `config.service/`；兼容旧服务的 `helper.pid` 与 `nl2sh-web.log` 位于 `/data/local/tmp/nl2sh-helper/`。在控制端打开返回的实际 URL，配置模型并使用 Agent。
 
 ## 已验证缓存回退
 
@@ -119,3 +119,11 @@ adb shell am instrument --user 0 -w -r -e class ernest.nl2sh.helper.LocalRuntime
 部分系统（包括已测试的 API 35 系统设置）会强制隐藏普通浮窗。此时保持配对码窗口打开，下拉通知栏，在助手配对通知点击“输入配对信息”，输入临时配对端口、空格和当前六位码后发送。通知显示结果后点击“返回助手”继续安装。首次需授予通知权限；若拒绝，可在系统应用通知设置中开启。通知回复框由系统渲染，不提供应用自定义密码掩码；发送后助手立即更新通知，不回显输入。该入口与浮窗共享配对逻辑，不保存配对码。
 
 浮窗验收：API 35 模拟器覆盖拖动、收起/展开、关闭、输入错误、数字键盘焦点、320dp/两倍字体滚动与横屏。系统设置强制隐藏浮窗，因此真实 TLS 配对通过通知兼容入口验证；返回助手后窗口与前台服务已清理，只保留 GUID 和连接端口。该结果不代表所有厂商设置页面都允许浮窗。
+
+## 安装模型参数
+
+连接页可指定 provider、model、API Key 和 endpoint，对齐在线 install-android.sh。支持 openrouter（默认）、openai、deepseek、moonshot（kimi）、siliconflow、ollama、custom；model 和 endpoint 留空使用在线脚本默认值，custom 必须填写 endpoint，API Key 可留空。Ollama 默认地址指向目标设备的 localhost。
+
+连接或更新操作会记住有效参数，即使后续连接失败也可复用。同一助手下次给另一台目标设备安装无需重复输入。API Key 使用 Android Keystore AES-GCM 加密，参数保存在应用私有数据，禁用系统备份，不写入日志。清除记住的模型参数不改变目标设备配置；卸载助手或清除应用数据会删除记忆，不自动同步到另一台运行助手的手机。
+
+仅首次部署且 /data/local/tmp/config.toml 不存在时以 600 权限初始化配置，API Key 经 ADB 文件传输，不进入 shell 命令。已有配置、重连、重启和更新保持目标模型设置；更改已安装设备的模型请使用 Web 设置。
